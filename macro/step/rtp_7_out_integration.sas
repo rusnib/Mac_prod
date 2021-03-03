@@ -13,12 +13,50 @@
 							mpOutOutfor=casuser.TS_OUTFOR, 
 							mpOutNnetWp=casuser.nnet_wp1,
 							mpPrmt=Y,
-							mpInLibref=&lmvInLibref.);
+							mpInLibref=&lmvInLibref.,
+							mpAuth = NO);
 
 	%if %sysfunc(sessfound(casauto))=0 %then %do;
 		cas casauto;
 		caslib _all_ assign;
 	%end;
+	
+	proc cas;
+		table.tableExists result = rc / caslib="mn_dict" name="NNET_WP1";
+		if rc=0  then do;
+			loadtable / caslib='mn_dict',
+						path='NNET_WP1_ATTR.sashdat',
+						casout={caslib="mn_dict" name='attr2', replace=true};
+			loadtable / caslib='mn_dict',
+						path='NNET_WP1.sashdat',
+						casout={caslib="mn_dict" name='nnet_wp1', replace=true};
+			attribute / task='ADD',
+						   caslib="mn_dict",
+						name='nnet_wp1',
+						attrtable='attr2';
+			table.promote / name="NNET_WP1" caslib="mn_dict" target="NNET_WP1" targetlib="mn_dict";
+		end;
+		else print("Table mn_dict.NNET_WP1 already loaded");
+		
+		table.tableExists result = rc / caslib="mn_dict" name="wp_gc";
+		if rc=0  then do;
+			loadtable / caslib='mn_dict',
+			path='wp_gc.sashdat',
+			casout={caslib="mn_dict" name='wp_gc', replace=true};
+			table.promote / name="wp_gc" caslib="mn_dict" target="wp_gc" targetlib="mn_dict";
+		end;
+		else print("Table mn_dict.wp_gc already loaded");	
+		
+		table.tableExists result = rc / caslib="mn_long" name="events_mkup";
+		if rc=0  then do;
+			loadtable / caslib='mn_long',
+			path='events_mkup.sashdat',
+			casout={caslib="mn_long" name='events_mkup', replace=true};
+			table.promote / name="events_mkup" caslib="mn_long" target="events_mkup" targetlib="mn_long";
+		end;
+		else print("Table mn_long.events_mkup already loaded");	
+	quit;	
+
 	%member_exists_list(mpMemberList=&mpMLPmixTabName.
 								&mpInEventsMkup.
 								&mpInWpGc.
@@ -51,15 +89,14 @@
 			lmvReportDt
 			lmvReportDttm
 			lmvInLibref
+			lmvAPI_URL
 			;
 			
-			
-	%let ETL_CURRENT_DT = %sysfunc(date());
-	%let ETL_CURRENT_DTTM = %sysfunc(datetime());
 	%let lmvInLib=ETL_IA;
 	%let lmvReportDt=&ETL_CURRENT_DT.;
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
 	%let lmvInLibref=&mpInLibref.;
+	%let lmvAPI_URL = &CUR_API_URL.;
 	
 	%member_names (mpTable=&mpOutOutfor, mpLibrefNameKey=lmvOutLibrefOutfor, mpMemberNameKey=lmvOutTabNameOutfor);
 	%member_names (mpTable=&mpOutOutforgc, mpLibrefNameKey=lmvOutLibrefOutforgc, mpMemberNameKey=lmvOutTabNameOutforgc); 
@@ -69,9 +106,30 @@
 	%member_names (mpTable=&mpOutGcLt, mpLibrefNameKey=lmvOutLibrefGcLt, mpMemberNameKey=lmvOutTabNameGcLt); 
 	%member_names (mpTable=&mpOutPmixLt, mpLibrefNameKey=lmvOutLibrefPmixLt, mpMemberNameKey=lmvOutTabNamePmixLt); 
 	%member_names (mpTable=&mpOutUptLt, mpLibrefNameKey=lmvOutLibrefUptLt, mpMemberNameKey=lmvOutTabNameUptLt); 
-/*Вытаскиваем прогнозы из VF*/	
-	/* Получение списка VF-проектов */
-	%vf_get_project_list(mpOut=work.vf_project_list);
+
+	%if &mpAuth. = YES %then %do;
+		%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+		
+		filename resp TEMP;
+		proc http
+		  method="GET"
+		  url="&lmvAPI_URL./analyticsGateway/projects?limit=99999"
+		  out=resp;
+		  headers 
+			"Authorization"="bearer &tmp_token."
+			"Accept"="application/vnd.sas.collection+json";    
+		run;
+		%put Response status: &SYS_PROCHTTP_STATUS_CODE;
+		
+		libname respjson JSON fileref=resp;
+		
+		data work.vf_project_list;
+		  set respjson.items;
+		run;
+	%end;
+	%else %if &mpAuth. = NO %then %do;
+		%vf_get_project_list(mpOut=work.vf_project_list);
+	%end;
 	/* Извлечение ID для VF-проекта PMIX по его имени */
 	%let lmvVfPmixName = &mpVfPmixProjName.;
 	%let lmvVfPmixId = %vf_get_project_id_by_name(mpName=&lmvVfPmixName., mpProjList=work.vf_project_list);
@@ -91,6 +149,11 @@
 			droptable casdata="&lmvOutTabNameUptLt." incaslib="&lmvOutLibrefUptLt." quiet;
 			droptable casdata="&lmvOutTabNameOutfor." incaslib="&lmvOutLibrefOutfor." quiet;
 			droptable casdata="&lmvOutTabNameOutforgc." incaslib="&lmvOutLibrefOutforgc." quiet;
+			droptable casdata="&lmvOutTabNameOutforgc." incaslib="&lmvOutLibrefOutforgc." quiet;
+			*droptable casdata="pmix_sales" incaslib="&lmvInLibref." quiet;
+			*droptable casdata="pmix_days_result" incaslib="&lmvInLibref." quiet;
+			droptable casdata="all_ml_scoring" incaslib="&lmvInLibref." quiet;
+			droptable casdata="all_ml_train" incaslib="&lmvInLibref." quiet;
 		run;
 	%end;
 /*0.9 Вытащить данные из проекта*/
@@ -185,7 +248,7 @@
 		(select t2.PBO_LOCATION_ID, t2.PRODUCT_ID, t2.sales_dt, t3.channel_cd
 				/* t2.P_REC_REC_SUM_QTY */
 				from
-                &mpMLPmixTabName t2 left join DM_ABT.ENCODING_CHANNEL_CD t3
+                &mpMLPmixTabName t2 left join MN_DICT.ENCODING_CHANNEL_CD t3
 				on t2.channel_cd=t3.channel_cd_id
 				where t2.sales_dt between &VF_FC_START_DT and &VF_FC_END_SHORT_DT ) t4
             on t1.PBO_LOCATION_ID=t4.PBO_LOCATION_ID and t1.PRODUCT_ID=t4.PRODUCT_ID and
@@ -335,11 +398,7 @@
 	  on t1.product_id=t2.PREDECESSOR_PRODUCT_ID and t1.pbo_location_id=t2.PREDECESSOR_DIM2_ID
 	  where t1.period_dt<coalesce(t2.PREDECESSOR_END_DT,cast(intnx('day',date %tslit(&vf_fc_agg_end_dt),1) as date));
 	quit;
-
-	proc casutil;
-			droptable casdata="plm_sales_mask1" incaslib="dm_abt" quiet;
-	run;
-
+	
 	proc fedsql sessref=casauto;
 	  /*удалить отсюда периоды временного и постоянного закрытия ПБО */
 	  create table casuser.plm_sales_mask1{options replace=true} as
@@ -412,11 +471,6 @@
 			;
 	quit;
 
-	proc casutil;
-			promote casdata="plm_sales_mask1" incaslib="casuser" outcaslib="dm_abt";
-			promote casdata="fc_w_plm" incaslib="casuser" outcaslib="casuser";
-	quit;
-/*======================================*/
 /*2.6 TODO: прогнозы GC от отдела развития - добавить к прогнозу GC insert-update*/
 
 /*2.7 TODO: Применение таблицы постоянных+временных закрытий к прогнозам GC*/
@@ -664,16 +718,14 @@
 	quit;
 	%if &mpPrmt. = Y %then %do;
 		proc casutil;
-		
-		promote casdata="pmix_daily" incaslib="casuser" outcaslib="mn_long";
-		save incaslib="mn_long" outcaslib="mn_long" casdata="pmix_daily" casout="pmix_daily.sashdat" replace;
-		
-		promote casdata="&lmvOutTabNamePmixLt." incaslib="&lmvOutLibrefPmixLt." outcaslib="&lmvOutLibrefPmixLt.";
-		save incaslib="&lmvOutLibrefPmixLt." outcaslib="&lmvOutLibrefPmixLt." casdata="&lmvOutTabNamePmixLt." casout="&lmvOutTabNamePmixLt..sashdat" replace;
-		promote casdata="&lmvOutTabNameGcLt." incaslib="&lmvOutLibrefGcLt." outcaslib="&lmvOutLibrefGcLt.";
-		save incaslib="&lmvOutLibrefGcLt." outcaslib="&lmvOutLibrefGcLt." casdata="&lmvOutTabNameGcLt." casout="&lmvOutTabNameGcLt..sashdat" replace;
-		promote casdata="&lmvOutTabNameUptLt." incaslib="&lmvOutLibrefUptLt." outcaslib="&lmvOutLibrefUptLt.";
-		save incaslib="&lmvOutLibrefUptLt." outcaslib="&lmvOutLibrefUptLt." casdata="&lmvOutTabNameUptLt." casout="&lmvOutTabNameUptLt..sashdat" replace;
+			promote casdata="&lmvOutTabNamePmixLt." incaslib="&lmvOutLibrefPmixLt." outcaslib="&lmvOutLibrefPmixLt.";
+			save incaslib="&lmvOutLibrefPmixLt." outcaslib="&lmvOutLibrefPmixLt." casdata="&lmvOutTabNamePmixLt." casout="&lmvOutTabNamePmixLt..sashdat" replace;
+			promote casdata="&lmvOutTabNameGcLt." incaslib="&lmvOutLibrefGcLt." outcaslib="&lmvOutLibrefGcLt.";
+			save incaslib="&lmvOutLibrefGcLt." outcaslib="&lmvOutLibrefGcLt." casdata="&lmvOutTabNameGcLt." casout="&lmvOutTabNameGcLt..sashdat" replace;
+			promote casdata="&lmvOutTabNameUptLt." incaslib="&lmvOutLibrefUptLt." outcaslib="&lmvOutLibrefUptLt.";
+			save incaslib="&lmvOutLibrefUptLt." outcaslib="&lmvOutLibrefUptLt." casdata="&lmvOutTabNameUptLt." casout="&lmvOutTabNameUptLt..sashdat" replace;
+			*promote casdata="pmix_daily" incaslib="casuser" outcaslib="mn_long";
+			*save incaslib="mn_long" outcaslib="mn_long" casdata="pmix_daily" casout="pmix_daily.sashdat" replace;
 		quit;
 	%end;
 %mend rtp_7_out_integration;

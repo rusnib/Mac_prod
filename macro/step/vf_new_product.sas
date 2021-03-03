@@ -1,5 +1,5 @@
 %macro vf_new_product(mpInCaslib=casshort);
-	option dsoptions=nonote2err;
+	*option dsoptions=nonote2err;
 	/***** 1. Создание интервалов продаж *****/
 	%local lmvInCaslib 
 			lmvReportDttm

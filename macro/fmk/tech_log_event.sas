@@ -1,27 +1,28 @@
-%MACRO tech_log_event(mpMODE=, mpPROCESS_NM=);
+%MACRO tech_log_event(mpmode=, mpprocess_nm=);
 	%GLOBAL
-		mvPROCESS_NM
-		mvPROCESS_ID
+		lmvProcessNm
+		lmvProcessId
+		lmvMode
 	;
-	%LET mvMODE = %upcase(&mpMODE.);
-	%let mvPROCESS_NM = &mpPROCESS_NM.;
-	%LET mvPREV_SAS_STATUS=0;
+	%LET lmvMode = %upcase(&mpMODE.);
+	%let lmvProcessNm = &mpPROCESS_NM.;
+	%LET lmvPrevSasStatus=0;
 	
 	/* ETL */
-	%LET mvEVENT_TYPE=ETL;
+	%LET lmvEventType=ETL;
 	
-	%LET mvMETA_USERNAME=&SYSUSERID.;
+	%LET lmvMetaUserName=&SYSUSERID.;
 		
-	%LET mvPROCESS_ID=&SYSJOBID.; 
+	%LET lmvProcessId=&SYSJOBID.; 
 	
-	%IF &mvMODE=START %THEN %DO;
+	%IF &lmvMode=START %THEN %DO;
 		
 		DATA _NULL_;
-			PROCESS_NM="&mvPROCESS_NM.";
-			PROCESS_ID="&mvPROCESS_ID."; 
+			PROCESS_NM="&lmvProcessNm.";
+			PROCESS_ID="&lmvProcessId."; 
 			PROCESS_STATUS="Job started";
-			CALL SYMPUTX("mvPROCESS_NM",STRIP(PROCESS_NM));
-			CALL SYMPUTX("mvPROCESS_ID",PROCESS_ID); 
+			CALL SYMPUTX("lmvProcessNm",STRIP(PROCESS_NM));
+			CALL SYMPUTX("lmvProcessId",PROCESS_ID); 
 			CALL SYMPUTX("mvPROCESS_STATUS",STRIP(PROCESS_STATUS));
 		RUN;
 		
@@ -33,8 +34,8 @@
 					VALUES
 						(
 							DEFAULT,
-							%STR(%')&mvPROCESS_NM.%STR(%'),
-							&mvPROCESS_ID,
+							%STR(%')&lmvProcessNm.%STR(%'),
+							&lmvProcessId,
 							%STR(%')&mvPROCESS_STATUS.%STR(%'),
 							'',
 							NOW(),
@@ -44,21 +45,21 @@
 							NULL, /*(select max(batch_id) from etl_cfg.cfg_batch_etl_cycle), */
 							NULL,
 							NULL,
-							%STR(%')&mvEVENT_TYPE.%STR(%'),
-							%STR(%')&mvMETA_USERNAME.%STR(%')
+							%STR(%')&lmvEventType.%STR(%'),
+							%STR(%')&lmvMetaUserName.%STR(%')
 						)
 				);
 		QUIT;
 		
 		%GLOBAL
-			mvPROCESS_NM
-			mvPROCESS_ID
+			lmvProcessNm
+			lmvProcessId
 			mvLOG_EVENT_ID
 			mvPRNT_EVENT_ID
 		;
 		
 		%IF &SYSCC>4 %THEN %DO;
-			%LET mvPREV_SAS_STATUS=1;
+			%LET lmvPrevSasStatus=1;
 			OPTIONS NOSYNTAXCHECK OBS=MAX;
 		%END;
 	
@@ -70,21 +71,21 @@
 					SELECT EVENT_ID
 					FROM ETL_CFG.CFG_LOG_EVENT
 					WHERE
-						PROCESS_NM=%STR(%')&mvPROCESS_NM.%STR(%') AND
-						PROCESS_ID=&mvPROCESS_ID. AND
+						PROCESS_NM=%STR(%')&lmvProcessNm.%STR(%') AND
+						PROCESS_ID=&lmvProcessId. AND
 						END_DTTM ISNULL
 				);
 			;
 		QUIT;
 		
-		%IF &mvPREV_SAS_STATUS=1 %THEN %DO;
+		%IF &lmvPrevSasStatus=1 %THEN %DO;
 			OPTIONS SYNTAXCHECK OBS=0;
 		%END;
 		
 		%LET mvPRNT_EVENT_ID=&mvLOG_EVENT_ID.;
 	
 	%END;
-	%ELSE %IF &mvMODE.=END %THEN %DO;
+	%ELSE %IF &lmvMode.=END %THEN %DO;
 		
 		%IF &SYSCC>4 %THEN %DO;
 			OPTIONS NOSYNTAXCHECK OBS=MAX;
@@ -119,8 +120,8 @@
 						end_dttm=now(),
 						processed_dt=current_date
 					WHERE
-						process_nm=%STR(%')&mvPROCESS_NM.%STR(%') and
-						process_id=&mvPROCESS_ID. and
+						process_nm=%STR(%')&lmvProcessNm.%STR(%') and
+						process_id=&lmvProcessId. and
 						end_dttm isnull AND
 						event_id=&mvLOG_EVENT_ID.
 				);

@@ -99,12 +99,14 @@
 				RSUBMIT T_&mvTHREAD_NUM. WAIT=NO CMACVAR=T_&mvTHREAD_NUM.;
 					options notes symbolgen mlogic mprint;
 
-					PROC PRINTTO LOG="/data/logs/log_score_thread_&mvTHREAD_NUM..txt" NEW;
-					RUN;
-			
-					CAS T_&mvTHREAD_NUM. HOST="sasdevinf.ru-central1.internal" PORT=5570;
-					caslib _all_ assign;
-					%include "/opt/sas/mcd_config/config/initialize_global.sas";
+			/* PROC PRINTTO LOG="/data/logs/log_of_thread_&mvTHREAD_NUM..txt" NEW;
+			RUN; */
+			%tech_redirect_log(mpMode=START, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
+	
+			/* CAS T_&mvTHREAD_NUM. HOST="sasdevinf.ru-central1.internal" PORT=5570; */
+			CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" PORT=5570;
+			caslib _all_ assign;
+			*%include "/opt/sas/mcd_config/config/initialize_global.sas";
 					
 					PROC SQL NOPRINT;
 						SELECT COUNT(*) AS CNT INTO :mvROW_CNT 
@@ -154,9 +156,10 @@
 						%m_rtp_train; */
 					%END;
 
-					PROC PRINTTO;
-					RUN;
-
+				%tech_redirect_log(mpMode=END, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
+				/* PROC PRINTTO;
+				RUN; */
+				
 				%MEND THREAD_MAIN;
 
 				%THREAD_MAIN;
@@ -183,7 +186,7 @@
 					%END;
 					%ELSE %DO;
 						%LET mvIN_PROCESS = %SYSEVALF(&mvIN_PROCESS. + &&T_&CHECK_ITER.);
-						%LET mvSLEEP=%SYSFUNC(SLEEP(100, 1));
+						%LET mvSLEEP=%SYSFUNC(SLEEP(20, 1));
 						%PUT TRYING TO GO NEXT STEP;
 					%END;
 				%END;

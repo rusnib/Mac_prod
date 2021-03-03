@@ -49,20 +49,20 @@
 	%member_names (mpTable=&mpEventsMkup, mpLibrefNameKey=lmvOutLibrefEventsMkup, mpMemberNameKey=lmvOutTabNameEventsMkup);
 	
 	%let lmvInLib=ETL_IA;
-	%let ETL_CURRENT_DT = %sysfunc(date());
-	%let ETL_CURRENT_DTTM = %sysfunc(datetime());
 	%let lmvReportDt=&ETL_CURRENT_DT.;
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
 	%let lmvOutLibref = &mpOutLibref.;
 	%let lmvClearFlg = %sysfunc(upcase(&mpClearFlg.));
 	
-	%if %sysfunc(sessfound(casauto))=0 %then %do;
-		cas casauto;
-		caslib _all_ assign;
-	%end;
+	%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						);
+						
 	/* clean caslib */
 	%if &lmvClearFlg. eq YES %then %do;
 		%tech_clean_lib(mpCaslibNm=&lmvOutLibref.);
+		%tech_clean_lib(mpCaslibNm=mn_short);
 	%end;
 	
 	/* Подтягиваем данные из PROMOTOOL */
@@ -289,55 +289,13 @@
 	  droptable casdata="pmix_sales" incaslib="&lmvOutLibref." quiet;
 	run;
 	
-	/* data CASUSER.pmix_sales (replace=yes drop=valid_from_dttm valid_to_dttm);
+	data CASUSER.pmix_sales (replace=yes drop=valid_from_dttm valid_to_dttm);
 		set &lmvInLib..pmix_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm. 
-			and sales_dt>=%sysfunc(intnx(year,&VF_HIST_START_DT_SAS.,0)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))));
-	run; */
-	
-	proc sql noprint;
-				create table work.pmix_full as 
-				select distinct t1.product_id, t1.pbo_location_id, t1.sales_dt, t1.channel_cd, t1.sales_qty, t1.gross_sales_amt, t1.net_sales_amt, t1.sales_qty_promo
-				from (select * 
-					  from etl_ia.pmix_sales t1
-				 	  where sales_dt>=%sysfunc(intnx(year,&VF_HIST_START_DT_SAS.,0)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))
-				) t1
-				inner join (select product_id, pbo_location_id, sales_dt, channel_cd, max(valid_to_dttm) as max
-						   from etl_ia.pmix_sales
-						  where sales_dt>=%sysfunc(intnx(year,&VF_HIST_START_DT_SAS.,0)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))
-							group by product_id, pbo_location_id, channel_cd, sales_dt
-						   ) t2 
-				on t2.product_id = t1.product_id
-				and t2.pbo_location_id = t1.pbo_location_id
-				and t2.sales_dt = t1.sales_dt
-				and t2.channel_cd = t1.channel_cd
-				and t2.max = t1.valid_to_dttm 
-				;
-			quit;
-
-		
-		data casuser.pmix_full(replace=yes);
-			set  work.pmix_full;
-		run;
-
-	proc fedsql sessref=casauto noprint; /*7.18*/
-		create table casuser.pmix_sales{options replace=true} as
-		select 
-		t1.PBO_LOCATION_ID
-		,t1.PRODUCT_ID
-		,t1.CHANNEL_CD
-		,t1.SALES_DT
-		,t1.SALES_QTY
-		,t1.SALES_QTY_PROMO
-		,t1.GROSS_SALES_AMT
-		,t1.NET_SALES_AMT
-		/* from casuser.pmix_sales t1 */
-		from casuser.pmix_full t1 
-		;
-	quit;
+			and sales_dt>=%sysfunc(intnx(month,&VF_HIST_START_DT_SAS.,10,b)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))));
+	run; 
 
 	proc casutil;
 	  promote casdata="pmix_sales" incaslib="casuser" outcaslib="&lmvOutLibref.";
-	   droptable casdata="pmix_full" incaslib="&lmvOutLibref." quiet;
 	run;
 
 	/*5. GC*/
@@ -345,51 +303,9 @@
 	  droptable casdata="pbo_sales" incaslib="&lmvOutLibref." quiet;
 	run;
 
-/*
-	data CASUSER.pbo_sales (replace=yes drop=valid_from_dttm valid_to_dttm);
-		set &lmvInLib..pbo_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.
-		and sales_dt>=%sysfunc(intnx(year,&VF_HIST_START_DT_SAS.,0)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))));
-	run;
-	
-	proc fedsql sessref=casauto noprint; 
-	  create table casuser.pbo_sales{options replace=true} as
-	  select 
-	  t1.PBO_LOCATION_ID
-	  ,t1.CHANNEL_CD
-	  ,t1.SALES_DT
-	  ,t1.RECEIPT_QTY
-	  ,t1.GROSS_SALES_AMT
-	  ,t1.NET_SALES_AMT
-	  from casuser.pbo_sales t1;
-	quit;
-*/
-	
-	proc sql noprint;
-		create table work.pbo_full as
-				select distinct t1.pbo_location_id, t1.sales_dt, t1.channel_cd, t1.receipt_qty, t1.gross_sales_amt, t1.net_sales_amt
-		from (select * 
-			  from etl_ia.pbo_sales t1
-		
-		) t1
-		inner join (select  pbo_location_id, channel_cd, sales_dt, max(valid_to_dttm) as max
-				   from etl_ia.pbo_sales 
-					group by  pbo_location_id, channel_cd,  sales_dt
-				   ) t2 
-		on t2.pbo_location_id = t1.pbo_location_id
-		and t2.sales_dt = t1.sales_dt
-		and t1.valid_to_dttm = t2.max
-		and t1.channel_cd = t2.channel_cd
-		;
-	quit;
-	
-	/*
-	proc casutil;
-	  promote casdata="pbo_sales" incaslib="casuser" outcaslib="&lmvOutLibref.";
-	run;
-	*/
-	
-	data casuser.pbo_sales(replace=yes);
-		set work.pbo_full;
+	data CASUSER.pbo_sales (replace=yes drop=valid_from_dttm valid_to_dttm keep=PBO_LOCATION_ID CHANNEL_CD SALES_DT RECEIPT_QTY GROSS_SALES_AMT NET_SALES_AMT);
+		set &lmvInLib..pbo_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		/* and sales_dt>=%sysfunc(intnx(year,&VF_HIST_START_DT_SAS.,0, b)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e)))); */
 	run;
 	
 	proc casutil;
@@ -523,23 +439,8 @@
 	  save incaslib="&lmvOutLibrefEvents." outcaslib="&lmvOutLibrefEvents." casdata="&lmvOutTabNameEvents." casout="&lmvOutTabNameEvents..sashdat" replace;
 	  save incaslib="&lmvOutLibrefEventsMkup." outcaslib="&lmvOutLibrefEventsMkup." casdata="&lmvOutTabNameEventsMkup." casout="&lmvOutTabNameEventsMkup..sashdat" replace;
 	  droptable casdata='events_intermid' incaslib='casuser' quiet;
-	  
-	  droptable casdata="&lmvOutTabNameEvents." incaslib='dm_abt' quiet;
-	  droptable casdata="&lmvOutTabNameEventsMkup." incaslib='dm_abt' quiet;
 	run;
 	
-	
-	
-	data dm_abt.&lmvOutTabNameEvents.(promote=yes);
-		set &lmvOutLibrefEvents..&lmvOutTabNameEvents.;
-	run;
-	
-	data dm_abt.&lmvOutTabNameEventsMkup.(promote=yes);
-		set &lmvOutLibrefEventsMkup..&lmvOutTabNameEventsMkup.;
-	run;
-
-
-
 	/* 8. media */
 	proc casutil;
 	  droptable casdata="media" incaslib="&lmvOutLibref." quiet;
@@ -687,21 +588,24 @@
     proc casutil;
       droptable casdata="ingridients" incaslib="&lmvOutLibref." quiet;
     run;
-
+	/*
 	data CASUSER.ingridients (replace=yes);
         set &lmvInLib..ingridients(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
     run;
-
-	/*
-	data CASUSER.ingridients (replace=yes);
-        set ETL_STG2.ia_ingridients;
-    run;
 	*/
+	
+	data CASUSER.ingridients (replace=yes);
+        set ETL_TMP.ia_ingridients;
+    run;
+	
 	
     proc casutil;
       promote casdata="ingridients" incaslib="casuser" outcaslib="&lmvOutLibref.";
     quit;
 	
-	cas casauto terminate;
+	%tech_cas_session(mpMode = end
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						);
 	
 %mend vf_load_data;

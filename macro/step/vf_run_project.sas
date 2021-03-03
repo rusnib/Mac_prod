@@ -28,12 +28,10 @@
 ****************************************************************************/
 %macro vf_run_project(mpProjectName=, mpLock=Y);
 	option mprint mlogic;
-	/*proc printto log='/data/tmp/privet_log.txt' new;*/
-	/*run;*/
 	
 	%local lmvAPI_URL lmvVfPboName lmvProjectId;
 	%let lmvAPI_URL = &CUR_API_URL.;
-	%put _ALL_;
+	*%put _ALL_;
 	filename resp TEMP;
 	
 	/* Получение списка VF-проектов */
@@ -41,6 +39,7 @@
 	/* Извлечение ID для VF-проекта по его имени */
 	%let lmvVfPboName = &mpProjectName.;
 	%let lmvProjectId = %vf_get_project_id_by_name(mpName=&lmvVfPboName., mpProjList=work.vf_project_list);
+	%put &=lmvVfPboName &=lmvProjectId;
 		
 	%if %sysfunc(sessfound(casauto))=0 %then %do;
 		cas casauto;
@@ -134,6 +133,7 @@
 	/******************************************************************************
 	** Run all pipelines...
 	******************************************************************************/
+	/* %restart_process: */
 	%put Run all pipelines...;
 	proc http
 		method="POST"
@@ -198,7 +198,9 @@
 
 	%if not (&jobState = completed) %then %do;
 		%put ERROR: An invalid response was received.;
-		%abort;
+		%return;
+		/* если ошибка произошла -> перезапускаем процессы
+		%goto restart_process; */
 	%end;
 
 	/******************************************************************************

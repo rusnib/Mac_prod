@@ -86,7 +86,8 @@
 %global VF_PMIX_PROJ_NM;			/* ID VF-проекта, построенного на pmix_sal_abt*/
 %global VF_PBO_ID;					/* Наименование VF-проекта, построенного на pbo_sal_abt*/
 %global VF_PBO_PROJ_NM;				/* Наименование VF-проекта, построенного на pbo_sal_abt*/
-
+%global RTP_TRAIN_FLG_PMIX;			/* Флаг запуска обучения моделей PMIX (Y/N)*/
+%global RTP_TRAIN_FLG_MC;			/* Флаг запуска обучения моделей MC (Y/N)*/
 %global SAS_START_CMD;              /* Путь к start_sas */
 
 /*===================================== GLOBAL ===================================*/
@@ -158,10 +159,12 @@
 %let VF_HIST_START_DT_SAS			= %sysfunc(inputn(%scan(%bquote(&VF_HIST_START_DT),2,%str(%')),yymmdd10.));
 %let VF_FC_END_SHORT_DT_SAS			= %sysfunc(intnx(day, &VF_FC_START_DT_SAS., 90));
 %let VF_FC_END_SHORT_DT 			= date%str(%')%sysfunc(putn(&VF_FC_END_SHORT_DT_SAS.,yymmdd10.))%str(%');
-%let VF_PMIX_ID						= 1ef9c222-17c4-477b-9667-a3ac07320c4e;
-%let VF_PBO_ID 						= c27c04d6-8789-4b2a-af8d-b2f751dc8cd0;
-%let VF_PMIX_PROJ_NM				= pmix_sales_v2;
-%let VF_PBO_PROJ_NM					= pbo_sales_v1;
+%let VF_PMIX_ID						= a55383f4-9bbb-4b48-93cd-538b7a96ead9;
+%let VF_PBO_ID 						= 50a3762d-58b0-4848-9125-cf3e9df0891d;
+%let VF_PMIX_PROJ_NM				= nm_abt_pmix;
+%let VF_PBO_PROJ_NM					= nm_abt_pbo;
+%let RTP_TRAIN_FLG_PMIX				= N;
+%let RTP_TRAIN_FLG_MC				= N;
 %let SAS_START_CMD                  =  &ETL_ROOT/config/start_sas.cmd;
 
 /*===================================== GLOBAL ===================================*/
@@ -194,7 +197,7 @@ options
    missing     = '.'
    nosortequals
    varinitchk     =  NOTE
-   dsoptions      =  "note2err"
+  /* dsoptions      =  "note2err" */
    /*sastrace=',,,d'
    sastraceloc=saslog*/
 ;
@@ -223,15 +226,12 @@ libname etl_ia postgres &ETL_IA_CONNECT_OPTIONS schema=etl_ia;
 libname etl_stg postgres &ETL_STG_CONNECT_OPTIONS schema=etl_stg;
 
 libname etl_cfg postgres &ETL_CFG_CONNECT_OPTIONS schema=etl_cfg;
-/*libname dm_rep postgres &DM_REP_CONNECT_OPTIONS schema=dm_rep;*/
-
-/*libname dm_abt postgres &DM_ABT_CONNECT_OPTIONS schema=dm_abt;*/
 
 libname pt postgres server="&CUR_API_URL." port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192";
 
 LIBNAME ia ORACLE &IA_CONNECT_OPTIONS SCHEMA=sas_interf;
 
-libname ETL_STG2 "/data/ETL_STG";
+libname ETL_TMP "/data/ETL_TMP";
 
 /*==================================== COMPUTED  =================================*/
 /* Вычисляемые настройки                                                          */

@@ -26,15 +26,21 @@
 ****************************************************************************/
 %macro rtp008_reconcil;
 
-	%let etls_jobName=rtp008_reconcil;
-	%etl_job_start;
+	%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=&SYSUSERID.
+						);
 	
-	%rtp_5_reconcil(mpFSAbt = dm_abt.pbo_train,
-					mpMasterCodeTbl = dm_abt.MASTER_CODE_DAYS_RESULT,
-					mpProductTable = DM_ABT.PMIX_DAYS_RESULT,
-					mpResultTable = DM_ABT.PMIX_RECONCILED_FULL
-					);
-
-	%etl_job_finish;
+	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_5_reconcil);
+	%tech_update_resource_status(mpStatus=P, mpResource=rtp_score_pmix);
+	%rtp_5_reconcil(mpFSAbt = mn_short.pbo_train,
+							mpMasterCodeTbl = mn_short.MASTER_CODE_DAYS_RESULT,
+							mpProductTable = mn_short.PMIX_DAYS_RESULT,
+							mpResultTable = mn_short.PMIX_RECONCILED_FULL
+							);
 	
+	%tech_update_resource_status(mpStatus=L, mpResource=rtp_score_pmix);
+	%tech_open_resource(mpResource=rtp_reconcil);
+	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_5_reconcil);	
 %mend rtp008_reconcil;

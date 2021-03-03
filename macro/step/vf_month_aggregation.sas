@@ -53,7 +53,8 @@
 							mpOutOutfor=mn_long.TS_OUTFOR, 
 							mpOutNnetWp=public.nnet_wp1,
 							mpInWpGc=mn_long.wp_gc,
-							mpPrmt=Y) ;
+							mpPrmt=Y,
+							mpAuth = NO);
 
 	%if %sysfunc(sessfound(casauto))=0 %then %do;
 		cas casauto;
@@ -74,16 +75,42 @@
 			lmvVfPmixId
 			lmvVfPboName
 			lmvVfPboId
+			lmvAPI_URL
 			;
-	
+	%let lmvAPI_URL = &CUR_API_URL.;
 	%member_names (mpTable=&mpOutPmix, mpLibrefNameKey=lmvOutLibrefPmix, mpMemberNameKey=lmvOutTabNamePmix); 
 	%member_names (mpTable=&mpOutOutforgc, mpLibrefNameKey=lmvOutLibrefOutforgc, mpMemberNameKey=lmvOutTabNameOutforgc); 
 	%member_names (mpTable=&mpOutGc, mpLibrefNameKey=lmvOutLibrefGc, mpMemberNameKey=lmvOutTabNameGc); 
 	%member_names (mpTable=&mpOutOutfor, mpLibrefNameKey=lmvOutLibrefOutfor, mpMemberNameKey=lmvOutTabNameOutfor);
 	%member_names (mpTable=&mpOutNnetWp, mpLibrefNameKey=lmvOutLibrefNnetWp, mpMemberNameKey=lmvOutTabNameNnetWp);
 
+
+	/* Получение токена аутентификации */
 	/* Получение списка VF-проектов */
-	%vf_get_project_list(mpOut=work.vf_project_list);
+	%if &mpAuth. = YES %then %do;
+		%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+		
+		filename resp TEMP;
+		proc http
+		  method="GET"
+		  url="&lmvAPI_URL./analyticsGateway/projects?limit=99999"
+		  out=resp;
+		  headers 
+			"Authorization"="bearer &tmp_token."
+			"Accept"="application/vnd.sas.collection+json";    
+		run;
+		%put Response status: &SYS_PROCHTTP_STATUS_CODE;
+		
+		libname respjson JSON fileref=resp;
+		
+		data work.vf_project_list;
+		  set respjson.items;
+		run;
+	%end;
+	%else %if &mpAuth. = NO %then %do;
+		%vf_get_project_list(mpOut=work.vf_project_list);
+	%end;
+	
 	/* Извлечение ID для VF-проекта PMIX по его имени */
 	%let lmvVfPmixName = &mpVfPmixProjName.;
 	%let lmvVfPmixId = %vf_get_project_id_by_name(mpName=&lmvVfPmixName., mpProjList=work.vf_project_list);
@@ -378,21 +405,20 @@
 
 
 			
-	/*TODO: если таблицы nnet_wp нет в CAS, поднять её сохранённую версию (в Public)*/
+	/*TODO: если таблицы nnet_wp нет в CAS, поднять её сохранённую версию*/
 	proc cas;
 		table.tableExists result = rc / caslib="&lmvOutLibrefNnetWp." name="&lmvOutTabNameNnetWp.";
 		if rc=0  then do;
-			loadtable / caslib=/*"&lmvOutLibrefNnetWp."*/ "dm_abt",
+			loadtable / caslib="&lmvOutLibrefNnetWp.",
 						path="&lmvOutTabNameNnetWp._attr.sashdat",
 						casout={caslib="&lmvOutLibrefNnetWp." name='attr2', replace=true};
-			loadtable / caslib=/*"&lmvOutLibrefNnetWp."*/"public",
+			loadtable / caslib="&lmvOutLibrefNnetWp.",
 						path="&lmvOutTabNameNnetWp..sashdat",
 						casout={caslib="&lmvOutLibrefNnetWp." name="&lmvOutTabNameNnetWp.", replace=true};
 			attribute / task='ADD',
 						   caslib="&lmvOutLibrefNnetWp.",
 						name="&lmvOutTabNameNnetWp.",
 						attrtable='attr2';
-						/* table.promote / name="&lmvOutTabNameNnetWp." caslib=="&lmvOutLibrefNnetWp." target="&lmvOutTabNameNnetWp." targetlib=="&lmvOutLibrefNnetWp."; */
 			table.promote / name="&lmvOutTabNameNnetWp." caslib="&lmvOutLibrefNnetWp." target="&lmvOutTabNameNnetWp." targetlib="&lmvOutLibrefNnetWp.";
 		end;
 		else print("Table &lmvOutLibrefNnetWp..&lmvOutTabNameNnetWp. already loaded");

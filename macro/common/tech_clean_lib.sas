@@ -56,7 +56,7 @@
 		%end;
 	%end;
 	%else %do;
-		%put "WARNING: Input parameter mpCaslibNm=&lmvCaslibNm. is invalid or caslib "&lmvCaslibNm." is empty.";
+		%put "WARNING: Input parameter mpCaslibNm=&lmvCaslibNm. is invalid or caslib &lmvCaslibNm. is empty.";
 		%return;
 	%end;
 

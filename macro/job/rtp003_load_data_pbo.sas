@@ -25,20 +25,24 @@
 *  21-07-2020  Борзунов     Начальное кодирование
 ****************************************************************************/
 %macro rtp003_load_data_pbo;
-	%include "/opt/sas/mcd_config/config/initialize_global.sas"; 
-
-	cas casauto authinfo="/home/sas/.authinfo" sessopts=(metrics=true);
-	caslib _ALL_ ASSIGN;
-	
-	%let etls_jobName=rtp003_load_data_pbo;
-	%etl_job_start;
-	%m_etl_update_resource_status(P, load_data_mcode);
+	%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=&SYSUSERID.
+						);
+						
+	%tech_update_resource_status(mpStatus=P, mpResource=rtp_abt_pbo_prepare);
 	/* 1. загрузка данных в CAS */
 	%rtp_3_load_data_pbo(mpMode=A, 
-							mpOutTableTrain=dm_abt.pbo_train,
-							mpOutTableScore=dm_abt.pbo_score); 
-	%m_etl_update_resource_status(L, load_data_mcode);
-	%m_etl_open_resource(load_data_pbo);
-	%etl_job_finish;
+							mpOutTableTrain=mn_short.pbo_train,
+							mpOutTableScore=mn_short.pbo_score); 
+	%tech_update_resource_status(mpStatus=L, mpResource=rtp_abt_pbo_prepare);
+	%tech_open_resource(mpResource=rtp_abt_pbo);
+	
+	*%tech_cas_session(mpMode = end
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=&SYSUSERID.
+						);
 	
 %mend rtp003_load_data_pbo;

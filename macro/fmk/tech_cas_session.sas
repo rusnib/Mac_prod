@@ -8,41 +8,51 @@
 * Входные параметры:
 *	mpCasSessNm=				+ Наименование CAS-сессии
 *	mpAssignFlg=				+ Флаг о подключении caslib (y/n)
-*	mpMode=				+ Статус сессии: запущен (start) или завершён (end)
+*	mpMode=						+ Статус сессии: запущен (start) или завершён (end)
+*	mpAuthinfoUsr=				+ Юзер, через которого будет выполнена аутентификация для CAS
 * Выходные параметры:
 *   нет
 *
 * Глобальные макропеременные:
 *
 * Пример вызова: 
-*	%tech_cas_session(
-*		mpCasSessNm= casauto,
-*		mpAssignFlg= y,
-*		mpMode= start
+*	tech_cas_session(mpMode = start
+*						,mpCasSessNm = casauto
+*						,mpAssignFlg= y
+*						,mpAuthinfoUsr=&SYSUSERID.
+*						);
 *	);
 *
 * Версия:
 *   1	-	13.01.2021	- Alexey Samsonov, Initial version
+*   2	-	14.02.2021	- rusnib, форматирование кода, добавление mpAuthinfoUsr
 ***************************************************************************/
 
-%macro tech_cas_session(mpMode= 
-						,mpCasSessNm=
-						,mpAssignFlg=
+%macro tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=
 						);
 
-	%local mpMode 
-			mpAssignFlg
-			mpCasSessNm
+	%local lmvMode 
+			lmvAssignFlg
+			lmvCasSessName
+			lmvAuthinfoUsr
 	;
 	
 	%let lmvMode = %upcase(&mpMode.);
 	%let lmvAssignFlg = %upcase(&mpAssignFlg.);
 	%let lmvCasSessName = %upcase(&mpCasSessNm.);
-
+	%let lmvAuthinfoUsr = %lowcase(&mpAuthinfoUsr.);
 	%if &lmvMode. = START %then %do;
-		cas &lmvCasSessName. sessopts=(metrics=true);
-		%if &lmvAssignFlg. = Y %then %do;
-			caslib _ALL_ ASSIGN SESSREF=&lmvCasSessName.;
+		%if %sysfunc(SESSFOUND(&lmvCasSessName)) = 0 %then %do; 
+			cas &lmvCasSessName. 
+			%if %length(&lmvAuthinfoUsr.) gt 0 %then %do; authinfo="/home/&lmvAuthinfoUsr./.authinfo_cas" %end;
+			sessopts=(metrics=true) ;
+			
+			%if &lmvAssignFlg. = Y %then %do;
+				caslib _ALL_ ASSIGN SESSREF=&lmvCasSessName.;
+			%end;
 		%end;
 	%end;
 	%if &lmvMode. = END %then %do;

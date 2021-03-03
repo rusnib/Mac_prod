@@ -416,11 +416,29 @@
 	  promote casdata="&lmvOutTabNamePboSalAbt._dlv" incaslib="casuser" outcaslib="mn_long";
 	   save incaslib="mn_long" outcaslib="mn_long" casdata="&lmvOutTabNamePboSalAbt._dlv" casout="&lmvOutTabNamePboSalAbt._dlv.sashdat" replace;
 	run;
-	/*
-	data public.&lmvOutTabNamePboSalAbt._dlv(promote=yes);
+	
+	
+	proc casutil;  
+		droptable casdata="&lmvOutTabNamePboSalAbt._dlv" incaslib="max_casl" quiet;
+		droptable casdata="&lmvOutTabNamePromoW1." incaslib="max_casl" quiet;
+		droptable casdata="&lmvOutTabNamePromoD." incaslib="max_casl" quiet;
+	quit;
+	data max_casl.&lmvOutTabNamePboSalAbt._dlv(promote=yes);
 		set mn_long.&lmvOutTabNamePboSalAbt._dlv;
 	run;
-	*/
+	data max_casl.&lmvOutTabNamePromoW1.(promote=yes);
+		set casuser.&lmvOutTabNamePromoW1.;
+	run;
+	data max_casl.&lmvOutTabNamePromoD.(promote=yes);
+		set casuser.&lmvOutTabNamePromoD.;
+	run;
+	proc casutil;
+	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePboSalAbt._dlv" casout="&lmvOutTabNamePboSalAbt._dlv.sashdat" replace;
+	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePromoW1." casout="&lmvOutTabNamePromoW1..sashdat" replace;
+	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePromoD." casout="&lmvOutTabNamePromoD..sashdat" replace;
+	run;
+	
+	
 	proc casutil;  
 		promote casdata="&lmvOutTabNamePboSalAbt." incaslib="casuser" outcaslib="&lmvOutLibrefPboSalAbt.";
 		promote casdata="&lmvOutTabNamePromoW1" incaslib="casuser" outcaslib="&lmvOutLibrefPromoW1";
@@ -448,23 +466,6 @@
 		droptable casdata="media_w" incaslib="casuser" quiet;
 		droptable casdata="macro1" incaslib="casuser" quiet;
 		droptable casdata="pbo_sales_rest" incaslib="mn_long" quiet;
-		
-		droptable casdata="&lmvOutTabNamePboSalAbt." incaslib="dm_abt" quiet;
-		droptable casdata="&lmvOutTabNamePboSalAbt._dlv" incaslib="dm_abt" quiet;
-	run;
-
-	data dm_abt.&lmvOutTabNamePboSalAbt.(promote=yes);
-		set &lmvOutLibrefPboSalAbt..&lmvOutTabNamePboSalAbt.;
-	run;
-	
-/*
-	data dm_abt.&lmvOutTabNamePboSalAbt._dlv(promote=yes);
-		set mn_long.&lmvOutTabNamePboSalAbt._dlv;
-	run;
-*/	
-	proc casutil;
-		save incaslib="dm_abt" outcaslib="dm_abt" casdata="&lmvOutTabNamePboSalAbt." casout="&lmvOutTabNamePboSalAbt..sashdat" replace;
-		*save incaslib="dm_abt" outcaslib="dm_abt" casdata="&lmvOutTabNamePboSalAbt._dlv" casout="&lmvOutTabNamePboSalAbt._dlv.sashdat" replace;
 	quit;
 	
 	cas casauto terminate;

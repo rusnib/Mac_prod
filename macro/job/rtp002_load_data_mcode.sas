@@ -25,26 +25,29 @@
 *  21-07-2020  Борзунов     Начальное кодирование
 ****************************************************************************/
 %macro rtp002_load_data_mcode;
-	%include "/opt/sas/mcd_config/config/initialize_global.sas"; 
-
-	cas casauto authinfo="/home/sas/.authinfo" sessopts=(metrics=true);
-	caslib _ALL_ ASSIGN;
+	%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=&SYSUSERID.
+						);
+						
+	%tech_update_resource_status(mpStatus=P, mpResource=rtp_abt_pmix);
 	
-	%let etls_jobName=rtp002_load_data_mcode;
-	%etl_job_start;
-	
-	%m_etl_update_resource_status(P, load_data_product);
-	
-	%rtp_2_load_data_mastercode_sep( mpMode=A,
+	%rtp_2_load_data_mastercode( mpMode=A,
 							mpInputTableScore=mn_short.all_ml_scoring, 
 							mpInputTableTrain=mn_short.all_ml_train,
 							mpOutputTableScore = mn_short.master_code_score,
-							mpOutputTableTrain = mn_short.master_code_train
+							mpOutputTableTrain = mn_short.master_code_train,
+							mpWorkCaslib=mn_short
 							);
 	
-	%m_etl_update_resource_status(L, load_data_product);
-	%m_etl_open_resource(load_data_mcode);
+	%tech_update_resource_status(mpStatus=L, mpResource=rtp_abt_pmix);
+	%tech_open_resource(mpResource=rtp_abt_mc);
 	
-	%etl_job_finish;
+	*%tech_cas_session(mpMode = end
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=&SYSUSERID.
+						);
 	
 %mend rtp002_load_data_mcode;

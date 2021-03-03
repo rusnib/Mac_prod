@@ -83,7 +83,7 @@
 		droptable casdata="&mpModTable." quiet;
 	run;
 
-	%let max_length = $500;
+	%let max_length = $1000;
 
 	data models.&mpModTable.;
 		length filter model params interval nominal &max_length.;

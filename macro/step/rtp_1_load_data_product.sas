@@ -55,48 +55,28 @@
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
 	%let lmvStartDateScore =%sysfunc(intnx(year,&etl_current_dt.,-1,s));
 	%let lmvWorkCaslib = &mpWorkCaslib.;
-
-	%if &lmvMode. = S %then %do;
-		/*%let lmvStartDate =%eval(%sysfunc(intnx(year,&etl_current_dt.,-1,s))-91);*/
-		%let lmvStartDate = %eval(%sysfunc(intnx(month,&etl_current_dt.,-15,s))-91);
-		%let lmvEndDate = &VF_HIST_END_DT_SAS.;
-		%let lmvScoreEndDate = %sysfunc(intnx(day,&VF_HIST_END_DT_SAS.,91,s));
-	%end;
-	%else %if &lmvMode = T or &lmvMode. = A %then %do;
-		/*%let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-3,s))-91);*/
-		%let lmvStartDate = %eval(%sysfunc(intnx(month,&etl_current_dt.,-15,s))-91);
-		/*%let lmvEndDate = &VF_HIST_END_DT_SAS.;*/
-		%let lmvEndDate = %sysfunc(intnx(year, %sysfunc(date()), -1, s));	
-		%let lmvScoreEndDate = %sysfunc(intnx(day,&VF_HIST_END_DT_SAS.,91,s));
-	%end;
+	%let lmvEndDate = &VF_HIST_END_DT_SAS.;
+	%let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-3,s))-91);
+	%let lmvScoreEndDate = %sysfunc(intnx(day,&VF_HIST_END_DT_SAS.,91,s));
 	
 	%member_names (mpTable=&mpOutTrain, mpLibrefNameKey=lmvLibrefOutTrain, mpMemberNameKey=lmvTabNmOutTrain);
-%member_names (mpTable=&mpOutTrain, mpLibrefNameKey=lmvLibrefOutTrain, mpMemberNameKey=lmvTabNmOutTrain);
-	%put &=lmvLibrefOutTrain;
-	%put &=lmvTabNmOutTrain;
-	
+	%member_names (mpTable=&mpOutTrain, mpLibrefNameKey=lmvLibrefOutTrain, mpMemberNameKey=lmvTabNmOutTrain);
 	%member_names (mpTable=&mpOutScore, mpLibrefNameKey=lmvLibrefOutScore, mpMemberNameKey=lmvTabNmOutScore);
 	
-	/****** 0. Объявление макропеременных ******/
-	options mprint nomprintnest nomlogic nomlogicnest nosymbolgen mcompilenote=all mreplace;
 	/*Создать cas-сессию, если её нет*/
 	%if %sysfunc(SESSFOUND(casauto)) = 0 %then %do; 
 		cas casauto;
 		caslib _all_ assign;
 	%end;
-	
-	/****** 1. Сбор "каркаса" из pmix ******/
-	/* Сначала собираем справочник товаров для того, чтобы создать фильтр */
+
 	proc casutil;
-	  %if &lmvMode. = A or &lmvMode. = T %then %do;
 		droptable casdata="&lmvTabNmOutTrain." incaslib="&lmvLibrefOutTrain." quiet;
-	  %end;
-	  %if &lmvMode. = A or &lmvMode. = S %then %do;
 		droptable casdata="&lmvTabNmOutScore." incaslib="&lmvLibrefOutScore." quiet;
-	  %end;
 		droptable casdata="abt1_ml" incaslib="casuser" quiet;
 	run;
 	
+	/****** 1. Сбор "каркаса" из pmix ******/
+	/* Сначала собираем справочник товаров для того, чтобы создать фильтр */
 	/* Подготовка таблицы с продажами */
 	proc fedsql sessref=casauto; 
 			create table casuser.abt1_ml{options replace=true} as
@@ -239,7 +219,7 @@
 	quit;
 
 	/* 4.3.2 Оставляем нулевые продажи в периодах ввода товаров из product chain */
-	/*
+	
 	proc fedsql sessref=casauto;
 		create table casuser.abt4_ml{options replace=true} as 
 			select
@@ -262,7 +242,7 @@
 				and t1.sales_dt <= %str(date%')%sysfunc(putn(&lmvEndDate.,yymmdd10.))%str(%')
 		;
 	quit;
-	*/
+	
 
 	/* 4.3 Убираем из истории пропуски в продажах */
 	proc fedsql sessref=casauto;
@@ -1634,7 +1614,7 @@
 		create table casuser.&lmvTabNmOutTrain.{options replace = true} as 
 			select *
 			from casuser.abt16_ml 
-			where sales_dt <= date %str(%')%sysfunc(putn(&lmvEndDate., yymmdd10.))%str(%')
+			where sales_dt >= date %str(%')%sysfunc(putn(%sysfunc(intnx(year,&lmvStartDate.,1,b)), yymmdd10.))%str(%')
 			;
 	%end;
 	%if &lmvMode. = A or &lmvMode = S %then %do;
@@ -1649,15 +1629,10 @@
 
 	proc casutil;
 		droptable casdata="abt16_ml" incaslib="casuser" quiet;
-		
-		 %if &lmvMode = T %then %do; 
-			save incaslib="&lmvLibrefOutTrain." outcaslib="&lmvLibrefOutTrain." casdata="&lmvTabNmOutTrain." casout="&lmvTabNmOutTrain..sashdat" replace;
-		%end;
-		%if &lmvMode. = A or &lmvMode = S %then %do;
-			promote casdata="&lmvTabNmOutTrain." incaslib="casuser" outcaslib="&lmvLibrefOutTrain.";
-			promote casdata="&lmvTabNmOutScore." incaslib="casuser" outcaslib="&lmvLibrefOutScore.";
-			save incaslib="&lmvLibrefOutScore." outcaslib="&lmvLibrefOutScore." casdata="&lmvTabNmOutScore." casout="&lmvTabNmOutScore..sashdat" replace; 
-		%end;
+		promote casdata="&lmvTabNmOutTrain." incaslib="casuser" outcaslib="&lmvLibrefOutTrain.";
+		promote casdata="&lmvTabNmOutScore." incaslib="casuser" outcaslib="&lmvLibrefOutScore.";
+		save incaslib="&lmvLibrefOutScore." outcaslib="&lmvLibrefOutScore." casdata="&lmvTabNmOutScore." casout="&lmvTabNmOutScore..sashdat" replace; 
+		save incaslib="&lmvLibrefOutTrain." outcaslib="&lmvLibrefOutTrain." casdata="&lmvTabNmOutTrain." casout="&lmvTabNmOutTrain..sashdat" replace;
 		droptable casdata="&lmvTabNmOutScore." incaslib="casuser" quiet;
 		droptable casdata="&lmvTabNmOutTrain." incaslib="casuser" quiet;
 	quit;

@@ -106,12 +106,14 @@
 	%DO mvTHREAD_NUM = 1 %TO &mvTHREAD_CNT.;
 		RSUBMIT T_&mvTHREAD_NUM. WAIT=NO CMACVAR=T_&mvTHREAD_NUM.;
 			options notes symbolgen mlogic mprint;
-			PROC PRINTTO LOG="/data/logs/log_of_thread_&mvTHREAD_NUM..txt" NEW;
-			RUN;
+			/* PROC PRINTTO LOG="/data/logs/log_of_thread_&mvTHREAD_NUM..txt" NEW;
+			RUN; */
+			%tech_redirect_log(mpMode=START, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
 	
-			CAS T_&mvTHREAD_NUM. HOST="sasdevinf.ru-central1.internal" PORT=5570;
+			/* CAS T_&mvTHREAD_NUM. HOST="sasdevinf.ru-central1.internal" PORT=5570; */
+			CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" PORT=5570;
 			caslib _all_ assign;
-			%include "/opt/sas/mcd_config/config/initialize_global.sas";
+			*%include "/opt/sas/mcd_config/config/initialize_global.sas";
 			
 			PROC SQL NOPRINT;
 				SELECT COUNT(*) AS CNT INTO :mvROW_CNT 
@@ -147,6 +149,14 @@
 							call symputx('train', train);
 						run;
 						
+						/* TEMP */
+						
+						%let nominal = %sysfunc(tranwrd(&nominal., %str(OTHER_DIGITAL), %str()));
+						%let nominal = %sysfunc(tranwrd(&nominal., %str(OTHER_DISCOUNT), %str()));
+						
+						/* TEMP */
+						
+						
 						%if &train. %then %do;
 							proc casutil incaslib="Models" outcaslib="Models";
 								droptable casdata="&mpPrefix._&i." quiet;
@@ -172,8 +182,9 @@
 					%m_rtp_train; */
 				%END;
 
-				PROC PRINTTO;
-				RUN;
+				%tech_redirect_log(mpMode=END, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
+				/* PROC PRINTTO;
+				RUN; */
 
 			%MEND THREAD_MAIN;
 

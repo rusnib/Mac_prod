@@ -23,7 +23,6 @@ cat /opt/sas/viya/config/etc/batchserver/default/autoexec.sas >> $tmpfile
 cat $etl_config_root/autoexec.sas >> $tmpfile
 
 sas_options="-log \"$logdir/$logname\" -autoexec \"$tmpfile\""
-
 # run SAS
 /opt/sas/viya/config/etc/batchserver/default/batchserver.sh -sysin $1 $sas_options
 

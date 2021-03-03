@@ -115,7 +115,7 @@
 	/*данные уже будут протянуты по дням*/
 	proc casutil;
 		promote casdata='pmix_sales_rest' incaslib='casuser' outcaslib='mn_long';
-		save casdata="pmix_sales_rest" casout="pmix_sales_rest.sashdat" incaslib="mn_long" outcaslib="mn_long" replace compress;
+		*save casdata="pmix_sales_rest" casout="pmix_sales_rest.sashdat" incaslib="mn_long" outcaslib="mn_long" replace compress;
 		droptable casdata='pmix_sales_rest' incaslib='CASUSER' quiet;
 		droptable casdata='TS_PMIX_SALES_day' incaslib='CASUSER' quiet;
 	run;
@@ -207,7 +207,7 @@
 	/*данные уже будут протянуты по дням*/
 	proc casutil;
 		promote casdata='pbo_sales_rest' incaslib='casuser' outcaslib='mn_long';
-		save casdata="pbo_sales_rest" casout="pbo_sales_rest.sashdat" incaslib="mn_long" outcaslib="mn_long" replace compress;
+		*save casdata="pbo_sales_rest" casout="pbo_sales_rest.sashdat" incaslib="mn_long" outcaslib="mn_long" replace compress;
 		droptable casdata='means_to_restore_gc' incaslib='CASUSER' quiet;
 		droptable casdata='TS_Pbo_SALES_day' incaslib='CASUSER' quiet;
 	quit;

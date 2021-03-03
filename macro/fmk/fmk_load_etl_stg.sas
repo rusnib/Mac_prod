@@ -83,8 +83,8 @@
 			);
 		execute by etl_cfg(
 			insert into etl_cfg.cfg_resource_registry(
-				event_id, resource_id, process_nm, extract_id, status_cd, exec_dttm, uploaded_from_source, uploaded_to_target)
-				VALUES (DEFAULT, &lmvResId., %str(%')load_etl_stg_&lmvResource.%str(%'), DEFAULT, 'P', current_timestamp, null, null)
+				event_id, resource_id, process_nm, extract_id, status_cd, exec_dttm, uploaded_from_source, uploaded_to_target, updated)
+				VALUES (DEFAULT, &lmvResId., %str(%')load_etl_stg_&lmvResource.%str(%'), DEFAULT, 'P', current_timestamp, null, null, null)
 			;
 			);
 		disconnect from etl_cfg;
@@ -113,7 +113,7 @@
 		set IA.IA_&lmvResource.;
 	%end;
 	%else %if %upcase(&lmvResTypeLoad.) eq WINDOW %then %do;
-		set IA.IA_&lmvResource.(where=(&lmvFieldTmFrame.>=intnx('day',&lmvFieldTmFrame., -&lmvTmFrameVal.,'s')));
+		set IA.IA_&lmvResource.(where=(datepart(&lmvFieldTmFrame.)>=intnx('day',today(), -&lmvTmFrameVal.,'s')));
 	%end;
 		%if &lmvOutDtVarsCnt. gt 0 %then %do;
 			%do i=1 %to &lmvOutDtVarsCnt.;

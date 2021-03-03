@@ -45,48 +45,57 @@
 							mpPromoW1=mn_long.promo_w1,
 							mpPromoD=mn_long.promo_d,
 							mpPboSales=mn_long.TS_pbo_sales,
-							mpWeatherW=mn_long.weather_w);
-
+							mpWeatherW=mn_long.weather_w,
+							mpAuth = NO);
+	*options nomprint mlogic nosymbolgen;
 	%if %sysfunc(sessfound(casauto))=0 %then %do;
 		cas casauto;
 		caslib _all_ assign;
 	%end;
 	
-	%local lmvOutLibrefPmixSalAbt lmvOutTabNamePmixSalAbt lmvVfPboName lmvVfPboId;
+	%local lmvOutLibrefPmixSalAbt lmvOutTabNamePmixSalAbt lmvVfPboName lmvProjectId lmvAPI_URL;
 	%let lmvInLib=ETL_IA;
-	%let ETL_CURRENT_DT = %sysfunc(date());
-	%let ETL_CURRENT_DTTM = %sysfunc(datetime());
 	%let lmvReportDt=&ETL_CURRENT_DT.;
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
-	%member_names (mpTable=&mpPmixSalAbt, mpLibrefNameKey=lmvOutLibrefPmixSalAbt, mpMemberNameKey=lmvOutTabNamePmixSalAbt);
-	/* Получение списка VF-проектов */
-	%vf_get_project_list(mpOut=work.vf_project_list);
-	/* Извлечение ID для VF-проекта по его имени */
+	%let lmvAPI_URL = &CUR_API_URL.;
 	%let lmvVfPboName = &mpVfPboProjName.;
-	%let lmvVfPboId = %vf_get_project_id_by_name(mpName=&lmvVfPboName., mpProjList=work.vf_project_list);
+	%member_names (mpTable=&mpPmixSalAbt, mpLibrefNameKey=lmvOutLibrefPmixSalAbt, mpMemberNameKey=lmvOutTabNamePmixSalAbt);
 	
+	
+	
+	%if &mpAuth. = YES %then %do;
+	/* Получение токена аутентификации */
+		%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+		
+		filename resp TEMP;
+		/* Получение списка VF-проектов */
+		proc http
+		  method="GET"
+		  url="&lmvAPI_URL./analyticsGateway/projects?limit=99999"
+		  out=resp;
+		  headers 
+			"Authorization"="bearer &tmp_token."
+			"Accept"="application/vnd.sas.collection+json";    
+		run;
+		%put Response status: &SYS_PROCHTTP_STATUS_CODE;
+		
+		libname respjson JSON fileref=resp;
+		
+		data work.vf_project_list;
+		  set respjson.items;
+		run;
+	%end;
+	%else %if &mpAuth. = NO %then %do;
+		%vf_get_project_list(mpOut=work.vf_project_list);
+	%end;
+	
+	%let lmvVfPboId = %vf_get_project_id_by_name(mpName=&lmvVfPboName., mpProjList=work.vf_project_list);
 	/*0. Удаление целевых таблиц */
 	proc casutil;
 		droptable casdata="&lmvOutTabNamePmixSalAbt." incaslib="&lmvOutLibrefPmixSalAbt." quiet;
 	run;
 	
 	/*1. Протяжка рядов pmix_sales и их аккумуляция */
-	*proc cas;
-	*	timeData.timeSeries result =r /
-		series={{name="sales_qty", Acc="sum", setmiss="missing"},
-		{name="gross_sales_amt", Acc="sum", setmiss="missing"},
-		{name="net_sales_amt", Acc="sum", setmiss="missing"},
-		{name="sales_qty_promo", Acc="sum", setmiss="missing"}}
-		tEnd= "&VF_FC_AGG_END_DT" /*VF_FC_START_DT+hor*/
-		table={caslib="mn_long",name="pmix_sales", groupby={"PBO_LOCATION_ID","PRODUCT_ID","CHANNEL_CD"} ,
-		where="sales_dt>=&VF_HIST_START_DT_SAS and channel_cd='ALL'"}
-		trimId="LEFT"
-		timeId="SALES_DT"
-		interval="week.2"
-		casOut={caslib="casuser",name="TS_pmix_sales",replace=True}
-		;
-	*	run;
-	*quit;
 	proc cas;
 	timeData.timeSeries result =r /
 		series={{name="sales_qty", Acc="sum", setmiss="missing"},
@@ -374,19 +383,25 @@
 			where t1.sales_dt>=&VF_HIST_START_DT and t1.channel_cd='DLV'
 		;
 	quit;
-
+	
 	proc casutil;
      promote casdata="&lmvOutTabNamePmixSalAbt._dlv" incaslib="casuser" outcaslib="mn_long";
-	 *save incaslib="mn_long" outcaslib="mn_long" casdata="&lmvOutTabNamePmixSalAbt._dlv" casout="&lmvOutTabNamePmixSalAbt._dlv.sashdat" replace;
+	 save incaslib="mn_long" outcaslib="mn_long" casdata="&lmvOutTabNamePmixSalAbt._dlv" casout="&lmvOutTabNamePmixSalAbt._dlv.sashdat" replace;
 	run;
-/*
-	data public.&lmvOutTabNamePmixSalAbt._dlv(promote=yes);
+
+	proc casutil;  
+		droptable casdata="&lmvOutTabNamePmixSalAbt._dlv" incaslib="max_casl" quiet;
+	quit;
+	data max_casl.&lmvOutTabNamePmixSalAbt._dlv(promote=yes);
 		set mn_long.&lmvOutTabNamePmixSalAbt._dlv;
 	run;
-*/	
+	proc casutil;
+	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePmixSalAbt._dlv" casout="&lmvOutTabNamePmixSalAbt._dlv.sashdat" replace;
+	run;
+	
 	proc casutil;
 		promote casdata="&lmvOutTabNamePmixSalAbt." incaslib="casuser" outcaslib="&lmvOutLibrefPmixSalAbt.";
-		*save incaslib="&lmvOutLibrefPmixSalAbt." outcaslib="&lmvOutLibrefPmixSalAbt." casdata="&lmvOutTabNamePmixSalAbt." casout="&lmvOutTabNamePmixSalAbt..sashdat" replace;
+		save incaslib="&lmvOutLibrefPmixSalAbt." outcaslib="&lmvOutLibrefPmixSalAbt." casdata="&lmvOutTabNamePmixSalAbt." casout="&lmvOutTabNamePmixSalAbt..sashdat" replace;
 		droptable casdata="TS_pmix_sales" incaslib="casuser" quiet;
 		droptable casdata="TS_WEEK_OUTFOR" incaslib="casuser" quiet;
 		droptable casdata="gc_fc_fact" incaslib="casuser" quiet;
@@ -395,25 +410,9 @@
 		droptable casdata="promo_pbo_prod_dist" incaslib="casuser" quiet;
 		droptable casdata="media_wps" incaslib="casuser" quiet;
 		droptable casdata="media_wp" incaslib="casuser" quiet;
-		droptable casdata="pmix_sales_rest" incaslib="casuser" quiet;
-		
-		droptable casdata="&lmvOutTabNamePmixSalAbt._dlv" incaslib="dm_abt" quiet;
-		droptable casdata="&lmvOutTabNamePmixSalAbt" incaslib="dm_abt" quiet;
-	run; 
-	/*
-	data dm_abt.&lmvOutTabNamePmixSalAbt._dlv(promote=yes);
-		set mn_long.&lmvOutTabNamePmixSalAbt._dlv;
-	run;
-	*/
-	data dm_abt.&lmvOutTabNamePmixSalAbt.(promote=yes);
-		set &lmvOutLibrefPmixSalAbt..&lmvOutTabNamePmixSalAbt.;
-	run;
-	
-	/* Сохраняем витрины для VF */
-	proc casutil;
-		save incaslib="dm_abt" outcaslib="dm_abt" casdata="&lmvOutTabNamePmixSalAbt." casout="&lmvOutTabNamePmixSalAbt..sashdat" replace;
-		*save incaslib="dm_abt" outcaslib="dm_abt" casdata="&lmvOutTabNamePmixSalAbt._dlv" casout="&lmvOutTabNamePmixSalAbt._dlv.sashdat" replace;
-	quit;
+		droptable casdata="pmix_sales_rest" incaslib="mn_long" quiet;
+		*droptable casdata="pmix_sales" incaslib="mn_long" quiet;
+	quit; 
 	
 	cas casauto terminate;
 	

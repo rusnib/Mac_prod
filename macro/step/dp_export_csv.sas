@@ -105,14 +105,11 @@
 			/* CALC SCORING WITH THREADS */
 			%DO mvTHREAD_NUM = 1 %TO &mvTHREAD_CNT.;
 				RSUBMIT T_&mvTHREAD_NUM. WAIT=NO CMACVAR=T_&mvTHREAD_NUM.;
+					*%tech_redirect_log(mpMode=START, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
 					options notes symbolgen mlogic mprint casdatalimit=all;
-					/* PROC PRINTTO LOG="/data/logs/create_part_csv_&mvTHREAD_NUM..txt" NEW;
-					RUN; */
-			
-					CAS T_&mvTHREAD_NUM. HOST="sasdevinf.ru-central1.internal" PORT=5570;
+					CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" authinfo="/home/&SYSUSERID./.authinfo_cas" PORT=5570;
 					caslib _all_ assign;
-					%include "/opt/sas/mcd_config/config/initialize_global.sas";
-	
+					
 					/* MAIN CODE FOR EACH THREAD */
 					%MACRO THREAD_MAIN;
 						DATA _NULL_;
@@ -121,12 +118,12 @@
 							CALL SYMPUTX("obs", obs);
 						RUN;
 						
-						DATA casuser.&mpInput._&mvTHREAD_NUM.(replace=yes datalimit=all);
+						DATA casuser.&mpInput._&mvTHREAD_NUM.(replace=yes);
 							SET casuser.gen_part(FIRSTOBS = &firstobs. OBS = &obs. drop=row_id);
 						RUN;
 										
 						%if %sysfunc(exist(casuser.&mpInput._&mvTHREAD_NUM.)) %then %do;
-							proc export data=casuser.&mpInput._&mvTHREAD_NUM.(datalimit=all)
+							proc export data=casuser.&mpInput._&mvTHREAD_NUM.
 										outfile="&mpPath.&mpInput._&mvTHREAD_NUM..csv"
 										dbms=dlm
 										replace
@@ -143,13 +140,10 @@
 							%return;
 						%end;
 
-					/*	PROC PRINTTO;
-						RUN; */
-
 					%MEND THREAD_MAIN;
 
 					%THREAD_MAIN;
-
+					*%tech_redirect_log(mpMode=END, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
 					ENDRSUBMIT;
 					
 			%END;	
@@ -157,12 +151,7 @@
 		%mend main_run;
 		%main_run;
 
-		%macro end_thread/*(mpOut=&mpOut.)*/;
-	
-			%local lmvTabNmAbt lmvLibrefAbt lmvLibrefOut lmvTabNmOut;
-			%member_names (mpTable=&mpAbt, mpLibrefNameKey=lmvLibrefAbt, mpMemberNameKey=lmvTabNmAbt);
-			%member_names (mpTable=&mpOut, mpLibrefNameKey=lmvLibrefOut, mpMemberNameKey=lmvTabNmOut);
-			
+		%macro end_thread;
 			/* CHECKING THREAD COMPLETION */
 			%LET mvIN_PROCESS = 1;
 			%DO %UNTIL (&mvIN_PROCESS=0);
@@ -172,7 +161,7 @@
 					%END;
 					%ELSE %DO;
 						%LET mvIN_PROCESS = %SYSEVALF(&mvIN_PROCESS. + &&T_&CHECK_ITER.);
-						%LET mvSLEEP=%SYSFUNC(SLEEP(1, 1));
+						%LET mvSLEEP=%SYSFUNC(SLEEP(200));
 						%PUT TRYING TO GO NEXT STEP;
 					%END;
 				%END;
@@ -192,7 +181,7 @@
 				DATA _NULL_;
 					CALL SYSTEM("rm &lmvTargetTableNm..csv &"); 
 				RUN;
-				%LET mvSLEEP=%SYSFUNC(SLEEP(5, 1));
+				%LET mvSLEEP=%SYSFUNC(SLEEP(2, 1));
 				
 				/* Соединение всех кусков в таргет-файл (в фоновом режиме, поэтому требуется SLEEP, 
 				чтобы операция завершилась до момента удаления файлов*/
@@ -208,7 +197,7 @@
 					CALL SYSTEM("cat &part_tables_row. > &lmvTargetTableNm..csv &");
 				RUN;
 
-				%LET mvSLEEP=%SYSFUNC(SLEEP(10, 1));
+				%LET mvSLEEP=%SYSFUNC(SLEEP(5, 1));
 				
 				/* Удаление промежуточных кусков  */
 				DATA _NULL_;
@@ -217,6 +206,7 @@
 				RUN; 
 
 			%mend dp_append_csv;	
+			
 			%dp_append_csv(mpPath=&mvPath., mpTargetTableNm=&mvTargetName.);
 			
 			proc casutil; 
@@ -234,5 +224,5 @@
 			%END;
 			
 		%mend end_thread;
-		%end_thread/*(mpOut=&mpOut.)*/;	
+		%end_thread;	
 %mend dp_export_csv;

@@ -1,0 +1,1 @@
+/opt/sas/mcd_config/bin/start_sas.sh /opt/sas/mcd_config/macro/step/krevedko.sas

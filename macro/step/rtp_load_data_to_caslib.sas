@@ -27,7 +27,7 @@
 ****************************************************************************/
 %macro rtp_load_data_to_caslib(mpWorkCaslib=casshort);
 
-	options mprint nomprintnest nomlogic nomlogicnest nosymbolgen mcompilenote=all mreplace;
+	*options mprint nomprintnest nomlogic nomlogicnest nosymbolgen mcompilenote=all mreplace;
 	
 	%local 	lmvInLib
 			lmvReportDttm 
@@ -40,15 +40,11 @@
 
 	
 	%let lmvInLib=ETL_IA;
-	%let etl_current_dt = %sysfunc(today());
-	%let ETL_CURRENT_DTTM = %sysfunc(datetime());
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
 	%let lmvStartDateScore =%sysfunc(intnx(year,&etl_current_dt.,-1,s));
 	%let lmvWorkCaslib = &mpWorkCaslib.;
-	/*
-	%let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-2,s))-91);
-*/
-	%let lmvStartDate = %eval(%sysfunc(intnx(month,&etl_current_dt.,-10,s))-91);
+	/* %let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-3,s))-91); */
+	%let lmvStartDate = %sysfunc(intnx(month,&etl_current_dt.,-30,b));
 	%let lmvEndDate = &VF_HIST_END_DT_SAS.;
 	%let lmvScoreEndDate = %sysfunc(intnx(day,&VF_HIST_END_DT_SAS.,91,s));
 	
@@ -58,6 +54,7 @@
 	%end;
 	
 	%tech_clean_lib(mpCaslibNm=&lmvWorkCaslib.);
+	%tech_clean_lib(mpCaslibNm=mn_long);
 							
 	%add_promotool_marks(mpOutCaslib=&lmvWorkCaslib.,
 							mpPtCaslib=pt);
@@ -188,64 +185,23 @@
 	run;
 
 	/* Подготовка таблицы с продажами (на время перезаливки таблицы ETL_IA.PMIX_SALES данные берем напрямую из IA) */
-	/* data CASUSER.pmix_sales(replace=yes  drop=valid_from_dttm valid_to_dttm);
+	data CASUSER.pmix_sales(replace=yes  drop=valid_from_dttm valid_to_dttm);
 			set &lmvInLib..pmix_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.
-			and sales_dt<=&lmvScoreEndDate. and sales_dt>=&lmvStartDate.));
+			and sales_dt<=&lmvEndDate. and sales_dt>=&lmvStartDate.));
 	run; 
 
 	proc casutil; 
 		droptable casdata="pmix_sales" incaslib="&lmvWorkCaslib." quiet;
 		promote casdata="pmix_sales" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 	run;
-*/
-			
-			proc sql noprint;
-				create table work.pmix_full as 
-				select distinct t1.product_id, t1.pbo_location_id, t1.sales_dt, t1.channel_cd, t1.sales_qty, t1.gross_sales_amt, t1.net_sales_amt, t1.sales_qty_promo
-				from (select * 
-				/*
-					  from etl_ia.pmix_sales t1
-					  */
-					    from etl_ia.pmix_sales t1
-				 	  where sales_dt > &lmvStartDate.
-				) t1
-				inner join (select product_id, pbo_location_id, sales_dt,channel_cd, max(valid_to_dttm) as max
-							/*
-						   from etl_ia.pmix_sales 
-						   */
-						    from etl_ia.pmix_sales
-						  where sales_dt > &lmvStartDate.
-							group by product_id, pbo_location_id, channel_cd, sales_dt
-						   ) t2 
-				on t2.product_id = t1.product_id
-				and t2.pbo_location_id = t1.pbo_location_id
-				and t2.sales_dt = t1.sales_dt
-				and t2.channel_cd = t1.channel_cd
-				and t2.max = t1.valid_to_dttm 
-				;
-			quit;
 
-
-
-			data casuser.pmix_sales(replace=yes);
-				set  work.pmix_full;
-			run;
-
-
-		proc casutil; 
-			promote casdata="pmix_sales" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
-		run;
-			
-	
-	
 	/****** 2. Добавление цен ******/
 	proc casutil;
 	  droptable casdata="price_ml" incaslib="casuser" quiet;
 	run;
 
 	 data CASUSER.price_ml (replace=yes  drop=valid_from_dttm valid_to_dttm);
-			set &lmvInLib..price(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.
-			and end_dt<=&lmvScoreEndDate. and start_dt>=&lmvStartDate.));
+			set &lmvInLib..price(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
 	run;
 
 	
@@ -261,7 +217,7 @@
 
 	data CASUSER.pbo_close_period (replace=yes  drop=valid_from_dttm valid_to_dttm);
 			set &lmvInLib..pbo_close_period(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.
-				and end_dt<=&lmvScoreEndDate. and start_dt>=&lmvStartDate.));
+				and end_dt<=&lmvEndDate. and start_dt>=&lmvStartDate.));
 	run;
 
 	/* заполняем пропуски в end_dt */
@@ -1200,8 +1156,9 @@
 	run;
 	
 	data CASUSER.ingridients (replace=yes);
-        set ETL_STG2.ia_ingridients;
+        set ETL_TMP.ia_ingridients;
     run;
+	
 	/*
 	data CASUSER.ingridients (replace=yes);
         set &lmvInLib..ingridients(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));

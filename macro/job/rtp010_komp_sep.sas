@@ -26,25 +26,27 @@
 ****************************************************************************/
 %macro rtp010_komp_sep;
 
-	%let etls_jobName=rtp010_komp_sep;
-	%etl_job_start;
+	%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=&SYSUSERID.
+						);
+						
+	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_komp_sep);				
+	%tech_update_resource_status(mpStatus=P, mpResource=rtp_out_integration);
 	
-	%rtp_komp_sep(mpVfPmixProjName=pmix_sales_v1,
-							mpVfPboProjName=pbo_sales_v1,
-							mpMLPmixTabName=dm_abt.pmix_reconciled_full,
-							mpInEventsMkup=dm_abt.events_mkup,
-							mpInWpGc=dm_abt.wp_gc,
-							mpOutPmixLt=casuser.plan_pmix_month,
-							mpOutGcLt=casuser.plan_gc_month, 
-							mpOutUptLt=casuser.plan_upt_month, 
-							mpOutPmixSt=casuser.plan_pmix_day,
-							mpOutGcSt=casuser.plan_gc_day, 
-							mpOutUptSt=casuser.plan_upt_day, 
-							mpOutOutforgc=casuser.TS_OUTFORGC,
-							mpOutOutfor=casuser.TS_OUTFOR, 
-							mpOutNnetWp=public.nnet_wp1,
-							mpPrmt=N) ;
-
-	%etl_job_finish;
+		%rtp_komp_sep(mpInPmixLt=mn_short.plan_pmix_month,
+						mpInGcLt=mn_short.plan_gc_month, 
+						mpInUptLt=mn_short.plan_upt_month, 
+						mpInPmixSt=mn_short.plan_pmix_day,
+						mpInGcSt=mn_short.plan_gc_day, 
+						mpInUptSt=mn_short.plan_upt_day, 
+						mpPathOut=/data/files/output/dp_files/);
+	
+	
+	%tech_update_resource_status(mpStatus=L, mpResource=rtp_out_integration);
+	%tech_open_resource(mpResource=rtp_komp_sep);
+	
+	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_komp_sep);	
 	
 %mend rtp010_komp_sep;
