@@ -26,27 +26,24 @@
 ****************************************************************************/
 %macro vf004_run_project_pbo;
 
-	%tech_cas_session(mpMode = start
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
-						
 	/* Получение токена аутентификации */
 	%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
 	
 	%tech_update_resource_status(mpStatus=P, mpResource=vf_prepare_ts_abt_pbo);
-	
-	%vf_run_project_rec(mpProjectName=&VF_PBO_PROJ_NM.); 
+	/*Запуск job в SASJobExecution */
+	filename resp TEMP;
+	proc http
+			method="GET"
+			url="https://10.252.151.9/SASJobExecution/?_program=/Maintenance_jobs/vf004_run_project_pbo"
+			out=resp;
+			headers
+				"Authorization"="bearer &tmp_token."
+				"Accept"="application/vnd.sas.job.execution.job+json";
+	run;
 
-	%tech_update_resource_status(mpStatus=L, mpResource=vf_prepare_ts_abt_pbo);
+	/* Ресурсы обновляются в джобе в JobExecution Maintenance_jobs/vf004_run_project_pbo */
+	*%tech_update_resource_status(mpStatus=L, mpResource=vf_prepare_ts_abt_pbo);
 	
-	%tech_open_resource(mpResource=vf_run_project_pbo);
-	
-	%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
-						
+	*%tech_open_resource(mpResource=vf_run_project_pbo);
+									
 %mend vf004_run_project_pbo;

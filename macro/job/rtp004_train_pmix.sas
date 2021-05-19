@@ -31,6 +31,8 @@
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
 						
+	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_4_modeling_train_pmix);					
+	
 	%tech_update_resource_status(mpStatus=P, mpResource=rtp_load_data);
 	/* 1. загрузка данных в CAS */
 			%rtp_4_modeling(mode=TRAIN,
@@ -51,5 +53,6 @@
 	%tech_update_resource_status(mpStatus=L, mpResource=rtp_load_data);
 	%tech_open_resource(mpResource=rtp_train_pmix);
 	
+	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_4_modeling_train_pmix);		
 	
 %mend rtp004_train_pmix;

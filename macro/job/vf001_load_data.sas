@@ -33,6 +33,8 @@
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
 						
+	%tech_log_event(mpMode=START, mpProcess_Nm=vf_load_data);	
+	
 	%tech_update_resource_status(mpStatus=P, mpResource=pmix_sales);
 	%tech_update_resource_status(mpStatus=P, mpResource=pbo_sales);
 	%tech_update_resource_status(mpStatus=P, mpResource=product);
@@ -61,10 +63,7 @@
 	
 	%tech_open_resource(mpResource=vf_load_data);
 	
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
-						
+	%tech_log_event(mpMode=END, mpProcess_Nm=vf_load_data);	
+
 %mend vf001_load_data;
+

@@ -26,6 +26,12 @@
 ****************************************************************************/
 %macro text_encoding(mpTable=, mpVariable=);
 
+	%local	lmvOutLibref
+			lmvOutTabName
+			;
+	
+	%member_names (mpTable=&mpTable., mpLibrefNameKey=lmvOutLibref, mpMemberNameKey=lmvOutTabName);
+
 	proc casutil;
 		droptable incaslib="casuser" casdata="encoding_&mpVariable." quiet;
 	run;
@@ -53,7 +59,7 @@
 	run;
 
 	proc fedsql sessref = casauto;
-		create Table casuser.&mpTable.{options replace=true} as 
+		create Table casuser.&lmvOutTabName.{options replace=true} as 
 		select
 		t1.*,
 		t2.&mpVariable._id

@@ -104,7 +104,7 @@
 		table={caslib="mn_long",name="pmix_sales_rest", groupby={"PBO_LOCATION_ID","PRODUCT_ID","CHANNEL_CD"} ,
 	         where="sales_dt>=&vf_hist_start_dt_sas"}
 		trimId="LEFT"
-		timeId="SALES_DT"
+		timeId={name="SALES_DT", format="DATE9."}
 		interval="week.2"
 		casOut={caslib="casuser",name="TS_pmix_sales",replace=True}
 		;
@@ -118,6 +118,11 @@
 			from "Analytics_Project_&lmvVfPboId".horizon
 		;
 	quit;
+	
+	data casuser.TS_WEEK_OUTFOR(replace=yes);
+		set casuser.TS_WEEK_OUTFOR;
+		format sales_dt date9.;
+	run;
 	
 	proc fedsql sessref=casauto noprint;
 		create table casuser.gc_fc_fact{options replace=true} as
@@ -193,7 +198,7 @@
 		series={{name="gross_price_amt", setmiss="prev"}}
 		tEnd= "&VF_FC_AGG_END_DT" /*VF_FC_START_DT+hor*/
 		table={caslib="casuser",name="price_nodup", groupby={"PBO_LOCATION_ID","PRODUCT_ID"} }
-		timeId="SALES_DT"
+		timeId={name="SALES_DT", format="DATE9."}
 		trimId="LEFT"
 		interval="day"
 		casOut={caslib="casuser",name="TS_price_fact",replace=True}
@@ -202,7 +207,7 @@
 		series={{name="gross_price_amt", acc="avg"}}
 		tEnd= "&VF_FC_AGG_END_DT" /*VF_FC_START_DT+hor*/
 		table={caslib="casuser",name="TS_price_fact", groupby={"PBO_LOCATION_ID","PRODUCT_ID"} }
-		timeId="SALES_DT"
+		timeId={name="SALES_DT", format="DATE9."}
 		trimId="LEFT"
 		interval="week.2"
 		casOut={caslib="casuser",name="TS_price_fact_agg",replace=True}
@@ -388,7 +393,7 @@
      promote casdata="&lmvOutTabNamePmixSalAbt._dlv" incaslib="casuser" outcaslib="mn_long";
 	 save incaslib="mn_long" outcaslib="mn_long" casdata="&lmvOutTabNamePmixSalAbt._dlv" casout="&lmvOutTabNamePmixSalAbt._dlv.sashdat" replace;
 	run;
-
+	/*
 	proc casutil;  
 		droptable casdata="&lmvOutTabNamePmixSalAbt._dlv" incaslib="max_casl" quiet;
 	quit;
@@ -398,7 +403,7 @@
 	proc casutil;
 	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePmixSalAbt._dlv" casout="&lmvOutTabNamePmixSalAbt._dlv.sashdat" replace;
 	run;
-	
+	*/
 	proc casutil;
 		promote casdata="&lmvOutTabNamePmixSalAbt." incaslib="casuser" outcaslib="&lmvOutLibrefPmixSalAbt.";
 		save incaslib="&lmvOutLibrefPmixSalAbt." outcaslib="&lmvOutLibrefPmixSalAbt." casdata="&lmvOutTabNamePmixSalAbt." casout="&lmvOutTabNamePmixSalAbt..sashdat" replace;
@@ -410,7 +415,7 @@
 		droptable casdata="promo_pbo_prod_dist" incaslib="casuser" quiet;
 		droptable casdata="media_wps" incaslib="casuser" quiet;
 		droptable casdata="media_wp" incaslib="casuser" quiet;
-		droptable casdata="pmix_sales_rest" incaslib="mn_long" quiet;
+		*droptable casdata="pmix_sales_rest" incaslib="mn_long" quiet;
 		*droptable casdata="pmix_sales" incaslib="mn_long" quiet;
 	quit; 
 	

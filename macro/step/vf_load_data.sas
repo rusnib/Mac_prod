@@ -66,7 +66,7 @@
 	%end;
 	
 	/* Подтягиваем данные из PROMOTOOL */
-	%add_promotool_marks(mpOutCaslib=casuser,
+	%add_promotool_marks2(mpOutCaslib=casuser,
 							mpPtCaslib=pt);
 	
 	/*-=-=-=-Подготовка данных и их загрузка в CAS-=-=-=-=-*/
@@ -289,9 +289,9 @@
 	  droptable casdata="pmix_sales" incaslib="&lmvOutLibref." quiet;
 	run;
 	
-	data CASUSER.pmix_sales (replace=yes drop=valid_from_dttm valid_to_dttm);
+	data CASUSER.pmix_sales (replace=yes drop=valid_from_dttm valid_to_dttm SALES_QTY_DISCOUNT GROSS_SALES_AMT_DISCOUNT NET_SALES_AMT_DISCOUNT);
 		set &lmvInLib..pmix_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm. 
-			and sales_dt>=%sysfunc(intnx(month,&VF_HIST_START_DT_SAS.,10,b)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))));
+			and sales_dt>=&VF_START_DATE. and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e))));
 	run; 
 
 	proc casutil;
@@ -338,11 +338,11 @@
 	proc casutil;
 	  droptable casdata="product_chain" incaslib="&lmvOutLibref." quiet;
 	run;
-
+	/*
 	data CASUSER.product_chain (replace=yes drop=valid_from_dttm valid_to_dttm);
 		set &lmvInLib..product_chain(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
 	run;
-
+	*/
 	proc fedsql sessref=casauto noprint;
 		create table casuser.product_chain{options replace=true} as
 		  select 
@@ -354,7 +354,7 @@
 			,SUCCESSOR_PRODUCT_ID
 			,PREDECESSOR_END_DT
 			,SUCCESSOR_START_DT
-		  from casuser.product_chain
+		  from casuser.product_chain_enh
 		;
 	quit;
 

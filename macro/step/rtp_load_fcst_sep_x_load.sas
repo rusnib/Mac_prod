@@ -1,3 +1,5 @@
+/* Макрос разбивает прогнозы (в шести разрезах) на komp|nonkomp и выгружает их в указанную каслибу */
+
 %macro rtp_load_fcst_sep_x_load(mpInPmixLt=dm_abt.plan_pmix_month,
 							mpInGcLt=dm_abt.plan_gc_month, 
 							mpInUptLt=dm_abt.plan_upt_month, 

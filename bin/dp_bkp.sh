@@ -3,7 +3,7 @@
 # Please verify all of these on target deployments
 export viya_config=/opt/sas/viya/config
 export pg_bin=/opt/sas/viya/home/postgresql11/bin
-export backup_dir=/data/A_LOBOK/
+export backup_dir=/data/backup/
 export pg_dbmsowner="dbmsowner"
 export cps_pg_dbmsowner="dbmsowner"
 export pg_port=5432
@@ -14,7 +14,7 @@ export chunksize=1024
 # End edit section
 
 #Version
-version_date="feb.18.2020"
+version_date="may.19.2021"
 echo "[Retail-Backup]: Version date: "$version_date 
 
 #Options (to be added...)

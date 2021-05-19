@@ -43,10 +43,5 @@
 	%tech_update_resource_status(mpStatus=L, mpResource=rtp_load_data);
 	%tech_open_resource(mpResource=rtp_abt_pmix);
 	
-	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_1_load_data_product);
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_1_load_data_product);
 %mend rtp001_load_data_product;

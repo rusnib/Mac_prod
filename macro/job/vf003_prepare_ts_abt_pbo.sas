@@ -32,6 +32,8 @@
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
 						
+	%tech_log_event(mpMode=START, mpProcess_Nm=vf_prepare_ts_abt_pbo);
+	
 	%tech_update_resource_status(mpStatus=P, mpResource=vf_restore_sales_gc);
 	
 	/*2. Загрузка таблицы pbo_sal_abt */
@@ -45,10 +47,6 @@
 	
 	%tech_open_resource(mpResource=vf_prepare_ts_abt_pbo);
 	
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=vf_prepare_ts_abt_pbo);
 	
 %mend vf003_prepare_ts_abt_pbo;

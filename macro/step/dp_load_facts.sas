@@ -1,11 +1,10 @@
-%macro dp_load_facts(mpFactGcMnth = dm_abt.fact_gc_month,
-					mpFactPmixMnth = dm_abt.fact_pmix_month,
-					mpFactUptMnth = dm_abt.fact_upt_month,
-					mpPath = /data/dm_rep/
+%macro dp_load_facts(mpFactGcMnth = mn_dict.fact_gc_month,
+					mpFactPmixMnth = mn_dict.fact_pmix_month,
+					mpFactUptMnth = mn_dict.fact_upt_month,
+					mpPath = /data/files/output/dp_files/
 					);
-
-	%M_ETL_REDIRECT_LOG(START, load_dp_facts, Main);
-	%M_LOG_EVENT(START, load_dp_facts);
+	
+	options notes symbolgen mlogic mprint casdatalimit=all;
 	
 	%local lmvLibrefGc 
 			lmvTabNmGc 
@@ -14,6 +13,7 @@
 			lmvLibrefUpt
 			lmvTabNmUpt
 			;
+			
 	%member_names(mpTable=&mpFactGcMnth, mpLibrefNameKey=lmvLibrefGc, mpMemberNameKey=lmvTabNmGc);
 	%member_names(mpTable=&mpFactPmixMnth, mpLibrefNameKey=lmvLibrefPmix, mpMemberNameKey=lmvTabNmPmix);
 	%member_names(mpTable=&mpFactUptMnth, mpLibrefNameKey=lmvLibrefUpt, mpMemberNameKey=lmvTabNmUpt);
@@ -25,7 +25,7 @@
 	%let etl_current_dt = %sysfunc(today());
 	%let ETL_CURRENT_DTTM = %sysfunc(datetime());
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
-	%let BeginOfYear = %sysfunc(intnx(year,&etl_current_dt.,0,b));
+	%let BeginOfYear = %sysfunc(intnx(year,&etl_current_dt.,-1,b));
 	%put &=BeginOfYear;
 
 	proc casutil;
@@ -33,36 +33,8 @@
 	run;
 
 	/* LOAD fact_gc_month */
-	
-	/*
 	data CASUSER.pbo_sales (replace=yes);
 		set &lmvInLib..pbo_sales(where=( (valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.) and sales_dt>=&BeginOfYear.));
-	run;
-	*/
-	
-	proc sql noprint;
-		create table work.pbo_full as
-				select distinct t1.pbo_location_id, t1.sales_dt, t1.channel_cd, t1.receipt_qty, t1.gross_sales_amt, t1.net_sales_amt
-		from (select * 
-			  from etl_ia.pbo_sales t1
-			  where sales_dt>=&BeginOfYear.
-			  and channel_cd='ALL'
-		
-		) t1
-		inner join (select  pbo_location_id, channel_cd, sales_dt, max(valid_to_dttm) as max
-				   from etl_ia.pbo_sales 
-				   where sales_dt>=&BeginOfYear.
-					group by  pbo_location_id, channel_cd,  sales_dt
-				   ) t2 
-		on t2.pbo_location_id = t1.pbo_location_id
-		and t2.sales_dt = t1.sales_dt
-		and t1.valid_to_dttm = t2.max
-		and t1.channel_cd = t2.channel_cd
-		;
-	quit;
-	
-	data casuser.pbo_sales(replace=yes);
-		set work.pbo_full;
 	run;
 	
 	proc fedsql sessref=casauto; 
@@ -81,7 +53,7 @@
 
 	proc fedsql sessref=casauto; 
 		create table casuser.fact_gc_month{options replace=true} as
-		select distinct '1' as PROD, pbo_location_id as LOCATION, month as DATA, 'RUR' as CURRENCY, 'CORP' as ORG, sum(receipt_qty) as FACT_GC_MONTH
+		select distinct '1' as PROD, pbo_location_id as LOCATION, month as DATA, 'RUR' as CURRENCY, sum(receipt_qty) as ACTUAL_GC_MONTH
 		from casuser.PBO_sales_prep_m
 		group by pbo_location_id, month;
 	quit;
@@ -97,38 +69,10 @@
 		droptable casdata="&lmvTabNmPmix." incaslib="&lmvLibrefPmix." quiet;
 	run;
 
-	/*
 	data CASUSER.pmix_sales (replace=yes);
 		set &lmvInLib..pmix_sales(where=( (valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.) and sales_dt>=&BeginOfYear.));
 	run;
-	*/
 	
-	proc sql noprint;
-				create table work.pmix_full as 
-				select distinct t1.product_id, t1.pbo_location_id, t1.sales_dt, t1.channel_cd, t1.sales_qty, t1.gross_sales_amt, t1.net_sales_amt, t1.sales_qty_promo
-				from (select * 
-					  from etl_ia.pmix_sales t1
-				 	  where sales_dt>=&BeginOfYear.
-					  and channel_cd='ALL'
-					  
-				) t1
-				inner join (select product_id, pbo_location_id, sales_dt, channel_cd, max(valid_to_dttm) as max
-						   from etl_ia.pmix_sales 
-						  where sales_dt>=&BeginOfYear.
-							group by product_id, pbo_location_id, channel_cd, sales_dt
-						   ) t2 
-				on t2.product_id = t1.product_id
-				and t2.pbo_location_id = t1.pbo_location_id
-				and t2.sales_dt = t1.sales_dt
-				and t2.channel_cd = t1.channel_cd
-				and t2.max = t1.valid_to_dttm 
-				;
-			quit;
-
-		
-		data casuser.pmix_sales(replace=yes);
-			set  work.pmix_full;
-		run;
 	proc fedsql sessref=casauto; 
 		create table casuser.sales_prep_m{options replace=true} as
 		select distinct product_id, 
@@ -142,7 +86,7 @@
 
 	proc fedsql sessref=casauto; 
 		create table casuser.fact_pmix_month{options replace=true} as
-			select product_id as PROD, pbo_location_id as LOCATION, month as DATA, 'RUR' as CURRENCY, 'CORP' as ORG, sum(sales_qty) as FACT_QNT_MONTH
+			select product_id as PROD, pbo_location_id as LOCATION, month as DATA, 'RUR' as CURRENCY, sum(sales_qty) as ACTUAL_QNT_MONTH
 		from casuser.sales_prep_m
 		group by product_id, pbo_location_id, month;
 	quit;
@@ -156,7 +100,7 @@
 	/* LOAD fact_upt_month */
 	proc fedsql sessref=casauto; 
 		Create table casuser.fact_upt_month{options replace=true} as
-		Select distinct t1.PROD, t1.LOCATION, t1.DATA, 'RUR' as CURRENCY, 'CORP' as ORG, (FACT_QNT_MONTH/FACT_GC_MONTH*1000) as FACT_UPT
+		Select distinct t1.PROD, t1.LOCATION, t1.DATA, 'RUR' as CURRENCY, (ACTUAL_QNT_MONTH/ACTUAL_GC_MONTH*1000) as ACTUAL_UPT
 		From casuser.&lmvTabNmPmix. t1
 		Inner join casuser.&lmvTabNmGc. t2 on t1.LOCATION=t2.LOCATION and t1.DATA=t2.DATA;
 	quit;
@@ -170,7 +114,7 @@
 	/* non-komp*/
 	proc fedsql sessref=casauto;
 		create table casuser.&lmvTabNmGc._nonkomp{options replace=true} as
-		select t1.* 
+		select distinct t1.* 
 		from casuser.&lmvTabNmGc. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
@@ -183,18 +127,29 @@
 		promote casdata="&lmvTabNmGc._nonkomp" incaslib="casuser" outcaslib="&lmvLibrefGc.";
 	quit;
 	
-	%dp_export_csv(mpInput=&lmvLibrefGc..&lmvTabNmGc._nonkomp
+	*%dp_export_csv(mpInput=&lmvLibrefGc..&lmvTabNmGc._nonkomp
 					, mpTHREAD_CNT=30
 					, mpPath=&mpPath.);
-	/*			
+	
+	%if %sysfunc(exist(&lmvLibrefGc..&lmvTabNmGc._nonkomp)) %then %do;
+		proc export data=&lmvLibrefGc..&lmvTabNmGc._nonkomp(datalimit=all)
+					outfile="&mpPath.&lmvTabNmGc._nonkomp.csv"
+					dbms=dlm
+					replace
+					;
+					delimiter='|'
+					;
+		run;
+	%end;
+				
 	proc casutil;
 		droptable casdata="&lmvTabNmGc._nonkomp" incaslib="&lmvLibrefGc." quiet;
 	quit;
-	*/
+	
 	
 	proc fedsql sessref=casauto;
 		create table casuser.&lmvTabNmPmix._nonkomp{options replace=true} as
-		select t1.* 
+		select distinct t1.* 
 		from casuser.&lmvTabNmPmix. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
@@ -207,18 +162,29 @@
 		promote casdata="&lmvTabNmPmix._nonkomp" incaslib="casuser" outcaslib="&lmvLibrefPmix.";
 	quit;
 	
-	%dp_export_csv(mpInput=&lmvLibrefPmix..&lmvTabNmPmix._nonkomp
+	*%dp_export_csv(mpInput=&lmvLibrefPmix..&lmvTabNmPmix._nonkomp
 					, mpTHREAD_CNT=30
 					, mpPath=&mpPath.);
-	/*				
+	
+	%if %sysfunc(exist(&lmvLibrefPmix..&lmvTabNmPmix._nonkomp)) %then %do;
+		proc export data=&lmvLibrefPmix..&lmvTabNmPmix._nonkomp(datalimit=all)
+					outfile="&mpPath.&lmvTabNmPmix._nonkomp.csv"
+					dbms=dlm
+					replace
+					;
+					delimiter='|'
+					;
+		run;
+	%end;
+				
 	proc casutil;
 		droptable casdata="&lmvTabNmPmix._nonkomp" incaslib="&lmvLibrefPmix." quiet;
 	quit;
-	*/
+	
 	
 	proc fedsql sessref=casauto;
 		create table casuser.&lmvTabNmUpt._nonkomp{options replace=true} as
-		select t1.* 
+		select distinct t1.* 
 		from casuser.&lmvTabNmUpt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
@@ -231,18 +197,29 @@
 		promote casdata="&lmvTabNmUpt._nonkomp" incaslib="casuser" outcaslib="&lmvLibrefUpt.";
 	quit;
 	
-	%dp_export_csv(mpInput=&lmvLibrefUpt..&lmvTabNmUpt._nonkomp
+	*%dp_export_csv(mpInput=&lmvLibrefUpt..&lmvTabNmUpt._nonkomp
 					, mpTHREAD_CNT=30
 					, mpPath=&mpPath.);
-	/*				
+	
+	%if %sysfunc(exist(&lmvLibrefUpt..&lmvTabNmUpt._nonkomp)) %then %do;
+		proc export data=&lmvLibrefUpt..&lmvTabNmUpt._nonkomp(datalimit=all)
+					outfile="&mpPath.&lmvTabNmUpt._nonkomp.csv"
+					dbms=dlm
+					replace
+					;
+					delimiter='|'
+					;
+		run;
+	%end;
+				
 	proc casutil;
 		droptable casdata="&lmvTabNmUpt._nonkomp" incaslib="&lmvLibrefUpt." quiet;
 	quit;
-	*/
+	
 	
 	proc fedsql sessref=casauto;
 		create table casuser.&lmvTabNmGc._komp{options replace=true} as
-		select t1.* 
+		select distinct t1.* 
 		from casuser.&lmvTabNmGc. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
@@ -255,18 +232,29 @@
 		promote casdata="&lmvTabNmGc._komp" incaslib="casuser" outcaslib="&lmvLibrefGc.";
 	quit;
 	
-	%dp_export_csv(mpInput=&lmvLibrefGc..&lmvTabNmGc._komp
+	*%dp_export_csv(mpInput=&lmvLibrefGc..&lmvTabNmGc._komp
 					, mpTHREAD_CNT=30
 					, mpPath=&mpPath.);
-	/*				
+	
+	%if %sysfunc(exist(&lmvLibrefGc..&lmvTabNmGc._komp)) %then %do;
+		proc export data=&lmvLibrefGc..&lmvTabNmGc._komp(datalimit=all)
+					outfile="&mpPath.&lmvTabNmGc._komp.csv"
+					dbms=dlm
+					replace
+					;
+					delimiter='|'
+					;
+		run;
+	%end;
+				
 	proc casutil;
 		droptable casdata="&lmvTabNmGc._komp" incaslib="&lmvLibrefGc." quiet;
 	quit;
-	*/
+	
 
 	proc fedsql sessref=casauto;
 		create table casuser.&lmvTabNmPmix._komp{options replace=true} as
-		select t1.* 
+		select distinct t1.* 
 		from casuser.&lmvTabNmPmix. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
@@ -279,18 +267,29 @@
 		promote casdata="&lmvTabNmPmix._komp" incaslib="casuser" outcaslib="&lmvLibrefPmix.";
 	quit;
 	
-	%dp_export_csv(mpInput=&lmvLibrefPmix..&lmvTabNmPmix._komp
+	*%dp_export_csv(mpInput=&lmvLibrefPmix..&lmvTabNmPmix._komp
 					, mpTHREAD_CNT=30
 					, mpPath=&mpPath.);
-	/*				
+	
+	%if %sysfunc(exist(&lmvLibrefPmix..&lmvTabNmPmix._komp)) %then %do;
+		proc export data=&lmvLibrefPmix..&lmvTabNmPmix._komp(datalimit=all)
+					outfile="&mpPath.&lmvTabNmPmix._komp.csv"
+					dbms=dlm
+					replace
+					;
+					delimiter='|'
+					;
+		run;
+	%end;
+			
 	proc casutil;
 		droptable casdata="&lmvTabNmPmix._komp" incaslib="&lmvLibrefPmix." quiet;
 	quit;
-	*/
+	
 	
 	proc fedsql sessref=casauto;
 		create table casuser.&lmvTabNmUpt._komp{options replace=true} as
-		select t1.* 
+		select distinct t1.* 
 		from casuser.&lmvTabNmUpt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
@@ -303,15 +302,24 @@
 		promote casdata="&lmvTabNmUpt._komp" incaslib="casuser" outcaslib="&lmvLibrefUpt.";
 	quit;
 	
-	%dp_export_csv(mpInput=&lmvLibrefUpt..&lmvTabNmUpt._komp
+	*%dp_export_csv(mpInput=&lmvLibrefUpt..&lmvTabNmUpt._komp
 					, mpTHREAD_CNT=30
 					, mpPath=&mpPath.);
-	/*				
+	
+	%if %sysfunc(exist(&lmvLibrefUpt..&lmvTabNmUpt._komp)) %then %do;
+		proc export data=&lmvLibrefUpt..&lmvTabNmUpt._komp(datalimit=all)
+					outfile="&mpPath.&lmvTabNmUpt._komp.csv"
+					dbms=dlm
+					replace
+					;
+					delimiter='|'
+					;
+		run;
+	%end;
+			
 	proc casutil;
 		droptable casdata="&lmvTabNmUpt._komp" incaslib="&lmvLibrefUpt." quiet;
 	quit;
-	*/
-	%M_ETL_REDIRECT_LOG(END, load_dp_facts, Main);
-	%M_LOG_EVENT(END, load_dp_facts);
+	
 	
 %mend dp_load_facts;

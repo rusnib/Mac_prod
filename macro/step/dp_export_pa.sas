@@ -22,7 +22,7 @@
 ******************************************************************
 *  Пример использования:
 *    dp_export_pa(mpPlanAreaNm=COMP_SALE_MONTH
-*						,mpOutTable=max_casl.dp_out_planArea_extr_pmix
+*						,mpOutTable=casuser.dp_out_planArea_extr_pmix
 *						,mpMode=caslib_csv
 *						,mpPath = /data/dm_rep/); 
 *
@@ -31,16 +31,14 @@
 ****************************************************************************/
 
 %macro dp_export_pa(mpPlanAreaNm=COMP_SALE_MONTH
-						,mpOutTable=max_casl.dp_out_planArea_extr_pmix
+						,mpOutTable=casuser.dp_out_planArea_extr_pmix
 						,mpMode=caslib_csv
 						,mpPath = /data/dm_rep/); 
 						
 	cas casauto sessopts=(metrics=true);
 	caslib _all_ assign;
 	
-	proc casutil;
-		droptable incaslib="CASUSERHDFS" casdata="planningAreaExtract" quiet;
-	run;
+	
 	
 	%global SYS_PROCHTTP_STATUS_CODE 
 			SYS_PROCHTTP_STATUS_PHRASE
@@ -59,6 +57,7 @@
 			lmvOutTabNameNm
 			;
 			
+	%let lmvOutTable = &mpOutTable.;
 	%member_names (mpTable=&lmvOutTable, mpLibrefNameKey=lmvOutLibrefNm, mpMemberNameKey=lmvOutTabNameNm); 
 			
 	%let lmvApiUrl = 10.252.151.3;
@@ -88,6 +87,10 @@
 	*/
 	
 	%if &lmvMode. = CASLIB %then %do;
+		proc casutil;
+			droptable incaslib="CASUSERHDFS" casdata="&lmvOutTabNameNm." quiet;
+		run;
+		
 		proc http
 			method="POST"
 			OAUTH_BEARER=SAS_SERVICES
@@ -203,6 +206,13 @@
 
 		data &lmvOutLibrefNm..&lmvOutTabNameNm.(promote=yes);
 			set casuserh.&lmvOutTabNameNm.;
+			Length p1 varchar(4) p2 varchar(3) p_all varchar(9) Date 8;
+			format Date date9.;
+			p1 = substr(Time, 1, 4);
+			p2 = substr(Time, 5, 3);
+			p_all = '01'||p2||p1;
+			Date = input(p_all, date9.);
+			drop p1 p2 p_all time;
 		run;
 	%end;
 %mend dp_export_pa;

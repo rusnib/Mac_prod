@@ -48,7 +48,8 @@
 				"Authorization"="bearer &tmp_token."
 				"Accept"="application/vnd.sas.job.execution.job+json";
 		run;
-
+	
+	/* Ресурсы обновляются в JobExecution /Maintenance_jobs/vf006_run_project_pmix */
 	*%tech_update_resource_status(mpStatus=L, mpResource=vf_prepare_ts_abt_pmix);
 	
 	*%tech_open_resource(mpResource=vf_run_project_pmix);

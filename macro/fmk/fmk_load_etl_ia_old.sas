@@ -4,10 +4,16 @@
 			lmvResId
 			lmvResNm
 			lmvDateTime
+			lmvPkList
+			lmvColumnsList
+			lmvResTypeLoad
+			lmvFieldTmFrame
+			lmvTmFrameVal
 	;
+	
 	%let lmvResource = %lowcase(&mpResource.);
 	%let lmvDateTime = %sysfunc(dhms(%sysfunc(date()), %sysfunc(hour(%sysfunc(time()))), %sysfunc(minute(%sysfunc(time()))), %sysfunc(second(%sysfunc(time()))) ));
-	%tech_log_event(mpMODE=START, mpPROCESS_NM=fmk_load_etl_ia_&lmvResource.);
+	%tech_log_event(mpMODE=START, mpPROCESS_NM=fmk_load_etl_ia_old_&lmvResource.);
 	
 	/* Проверка на валидность входных параметров (Сущ-е ресурса) */
 	proc sql noprint;
@@ -132,201 +138,239 @@
 	quit;
 	%put &=lmvPkList &=lmvColumnsList;
 	
-	/* Забираем окно из главной таблицы со старыми данными и расчитываем хеши (по фактам и по ключам)*/
-	data work.tmp_&lmvResource._snap_hsh;
-		length pk_hash value_hash $32;
-		format  pk_hash value_hash $hex32.;
-		%if %upcase(&lmvResTypeLoad.) eq FULL %then %do;
-			set etl_ia.&lmvResource.(where=(valid_from_dttm<=&ETL_CURRENT_DTTM. and valid_to_dttm>=&ETL_CURRENT_DTTM.));
-		%end;
-		%else %if %upcase(&lmvResTypeLoad.) eq WINDOW %then %do;
-			set etl_ia.&lmvResource.(where=( (&lmvFieldTmFrame. >= today()-&lmvTmFrameVal.) and (valid_from_dttm<=&ETL_CURRENT_DTTM. and valid_to_dttm>=&ETL_CURRENT_DTTM.)));
-		%end;
-		pk_hash = SHA256HEX(catx('_', &lmvPkList.));
-		value_hash= SHA256HEX(catx('_', &lmvColumnsList.));
-	run;
-	
-	/*Расчитываем хеш для новой пачки данных */
-	data work.tmp_&lmvResource._delta_hsh;
-		length pk_hash value_hash $32;
-		format pk_hash value_hash $hex32.;
-		set work.tmp_&lmvResource._delta; 
-		pk_hash = SHA256HEX(catx('_', &lmvPkList.));
-		value_hash= SHA256HEX(catx('_', &lmvColumnsList.));
-	run;
-	
-	proc sql noprint;
-		create table work.&lmvResource._hash_cfg as
-			select distinct n.pk_hash, n.value_hash, o.valid_from_dttm,
-					case 
-						when n.value_hash = o.value_hash
-						then 2 /*same values*/
-						when n.value_hash ne o.value_hash and o.value_hash ne ' '
-						then 3 /*diff values*/
-						else 1 /*new*/
-					end as flag 
-			from work.tmp_&lmvResource._delta_hsh n
-				left join work.tmp_&lmvResource._snap_hsh o 
-					on n.pk_hash = o.pk_hash
-					and o.valid_to_dttm = &ETL_SCD_FUTURE_DTTM.
-			where calculated flag ne 2
-		;
-		/*extract delta*/
-		create table work.&lmvResource._chkd_dlt as
-			select distinct mn.*
-			from work.tmp_&lmvResource._delta_hsh mn
-			inner join work.&lmvResource._hash_cfg h
-				on mn.pk_hash =h.pk_hash
-			where h.flag in (1,3) 
-		;
-		/*extract diffs (snup)*/
-		create table work.&lmvResource._chkd_snup as
-			select distinct mn.*
-			from work.tmp_&lmvResource._snap_hsh mn
-			inner join work.&lmvResource._hash_cfg h
-				on mn.pk_hash =h.pk_hash
-			where h.flag = 3 
-		;
-	quit;
-	
-	/*create table for dcl hash*/
-	data work.&lmvResource._hash_diffs (drop=valid_from_dttm pk_hash);
-		length hash_value_dttm_id $32;
-		set work.&lmvResource._chkd_snup(keep=valid_from_dttm pk_hash);
-		hash_value_dttm_id = SHA256HEX(catx('_',pk_hash,valid_from_dttm));
-	run; 
-	/* update with hash */
-	data work.&lmvResource.(drop=rc hash_value_dttm_id);
-		length hash_value_dttm_id $32 pk_hash $32;;
-		if _n_=1 then do;
-			DECLARE HASH H (DATASET:"work.&lmvResource._hash_diffs");
-			RC=H.DEFINEKEY("hash_value_dttm_id");
-			RC=H.DEFINEDATA();
-			RC=H.DEFINEDONE();
-			call missing(hash_value_dttm_id);
-		end;
-		set tmp_&lmvResource._snap_hsh;
-		/* set etl_ia.&lmvResource.; */
-		pk_hash = SHA256HEX(catx('_', &lmvPkList.));
-		hash_value_dttm_id = SHA256HEX(catx('_',pk_hash,valid_from_dttm));
-		rc=h.find();
-		if (rc=0) then do;
-			valid_to_dttm = &lmvDateTime.;
-		end;
-	run;
-
-	%if &SYSCC gt 4 %then %do;
-		/* Return session in execution mode */
-		OPTIONS NOSYNTAXCHECK OBS=MAX;
+	/* В случае отсутствия ПК для таблицы невозможно загрузить данные по типу scd2. 
+	В таком случае, заливаем данные в etl_ia полностью из etl_stg */
+	%if %length(&lmvPkList.) eq 0 %then %do;
+		/* Очищаем целевую таблицу */
 		proc sql noprint;
-			connect using etl_cfg;
-			execute by etl_cfg(
-				update etl_cfg.cfg_resource_registry
-				set status_cd='E'
-				where resource_id = &lmvResId. and status_cd in ('P') and uploaded_from_source is null and uploaded_to_target is null;
-			);
-		quit;
-		
-		%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
-		%abort;
-	%end;
-		
-	proc sql noprint;
-		connect using etl_ia;
-		/* TEST */
-		/* Можно не удалять!!! */%if %upcase(&lmvResTypeLoad.) eq FULL %then %do;
-			execute by etl_ia (
-			/*	truncate etl_ia.&lmvResource. */
-				
-				delete from etl_ia.&lmvResource.
-				where valid_to_dttm = &ETL_SCD_FUTURE_DTTM_DB.;
-			);
-		%end;
-		%else %if %upcase(&lmvResTypeLoad.) eq WINDOW %then %do;
-			execute by etl_ia (
-				delete from  etl_ia.&lmvResource.
-				where &lmvFieldTmFrame. >= current_date - &lmvTmFrameVal. and valid_to_dttm = &ETL_SCD_FUTURE_DTTM_DB.;
+			connect using etl_ia;
+				execute by etl_ia (
+					TRUNCATE etl_ia.&lmvResource.;
 				);
-		%end;
-	quit;
-	
-	/*Загружаем данные в целевую таблицу */
-	proc append base=etl_ia.&lmvResource.(&ETL_PG_BULKLOAD.) data=work.&lmvResource.(drop=pk_hash value_hash) force;
-	run;
-	
-	%if &SYSCC gt 4 %then %do;
-		/* Return session in execution mode */
-		OPTIONS NOSYNTAXCHECK OBS=MAX;
+		quit;
+		/* Добавляем дельту к главной таблице*/
+		proc append base=etl_ia.&lmvResource. (&ETL_PG_BULKLOAD.) data=work.tmp_&lmvResource._delta force;
+		run;
+		
+		/* Calc uploaded/updated rows */
+		%let lmvCntRowsTarget = %member_obs(mpData=work.tmp_&lmvResource._delta);
+		%let lmvCntUpdatedRows = 0;
+		
+		%put Count of updated rows in table &lmvResource. = &lmvCntUpdatedRows. and count of uploaded rows  = &lmvCntRowsTarget.;
+	%end;
+	/* Загрузка данных по типу scd2 */
+	%else %do;
+		/* Забираем окно из главной таблицы со старыми данными и расчитываем хеши (по фактам и по ключам)*/
+		data work.tmp_&lmvResource._snap_hsh;
+			length pk_hash value_hash $32;
+			format  pk_hash value_hash $hex32.;
+			%if %upcase(&lmvResTypeLoad.) eq FULL %then %do;
+				set etl_ia.&lmvResource.(where=(valid_from_dttm<=&ETL_CURRENT_DTTM. and valid_to_dttm>=&ETL_CURRENT_DTTM.));
+			%end;
+			%else %if %upcase(&lmvResTypeLoad.) eq WINDOW %then %do;
+				set etl_ia.&lmvResource.(where=( (&lmvFieldTmFrame. >= today()-&lmvTmFrameVal.) and (valid_from_dttm<=&ETL_CURRENT_DTTM. and valid_to_dttm>=&ETL_CURRENT_DTTM.)));
+			%end;
+			pk_hash = SHA256HEX(catx('_', &lmvPkList.));
+			/* Проверка на наличие фактов */
+			%if %length(&lmvColumnsList.) gt 0 %then %do;
+				value_hash= SHA256HEX(catx('_', &lmvColumnsList.));
+			%end;
+			%else %do;
+				value_hash= SHA256HEX('');
+			%end;
+		run;
+		
+		/*Расчитываем хеш для новой пачки данных */
+		data work.tmp_&lmvResource._delta_hsh;
+			length pk_hash value_hash $32;
+			format pk_hash value_hash $hex32.;
+			set work.tmp_&lmvResource._delta; 
+			pk_hash = SHA256HEX(catx('_', &lmvPkList.));
+			/* Проверка на наличие фактов */
+			%if %length(&lmvColumnsList.) gt 0 %then %do;
+				value_hash= SHA256HEX(catx('_', &lmvColumnsList.));
+			%end;
+			%else %do;
+				value_hash= SHA256HEX('');
+			%end;
+		run;
+		
 		proc sql noprint;
-			connect using etl_cfg;
-			execute by etl_cfg(
-				update etl_cfg.cfg_resource_registry
-				set status_cd='E'
-				where resource_id = &lmvResId. and status_cd in ('P') and uploaded_from_source is null and uploaded_to_target is null;
-			);
+			create table work.&lmvResource._hash_cfg as
+				select distinct n.pk_hash, n.value_hash, o.valid_from_dttm,
+						case 
+							when n.value_hash = o.value_hash
+							then 2 /*same values*/
+							when n.value_hash ne o.value_hash and o.value_hash ne ' '
+							then 3 /*diff values*/
+							else 1 /*new*/
+						end as flag 
+				from work.tmp_&lmvResource._delta_hsh n
+					left join work.tmp_&lmvResource._snap_hsh o 
+						on n.pk_hash = o.pk_hash
+						and o.valid_to_dttm = &ETL_SCD_FUTURE_DTTM.
+				where calculated flag ne 2
+			;
+			/*extract delta*/
+			create table work.&lmvResource._chkd_dlt as
+				select distinct mn.*
+				from work.tmp_&lmvResource._delta_hsh mn
+				inner join work.&lmvResource._hash_cfg h
+					on mn.pk_hash =h.pk_hash
+				where h.flag in (1,3) 
+			;
+			/*extract diffs (snup)*/
+			create table work.&lmvResource._chkd_snup as
+				select distinct mn.*
+				from work.tmp_&lmvResource._snap_hsh mn
+				inner join work.&lmvResource._hash_cfg h
+					on mn.pk_hash =h.pk_hash
+				where h.flag = 3 
+			;
 		quit;
 		
-		%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
-		%abort;
-	%end;
-	
-	/*Загружаем дельту */
-	%cmn_load_etl_ia_artefacts(mpMode=delta
-								,mpTargetTableNm=&lmvResource.
-								,mpInputTableNm=work.&lmvResource._chkd_dlt
-								);
-	/* Загружаем snup */
+		/*create table for dcl hash*/
+		data work.&lmvResource._hash_diffs (drop=valid_from_dttm pk_hash);
+			length hash_value_dttm_id $32;
+			set work.&lmvResource._chkd_snup(keep=valid_from_dttm pk_hash);
+			hash_value_dttm_id = SHA256HEX(catx('_',pk_hash,valid_from_dttm));
+		run; 
 
-	%cmn_load_etl_ia_artefacts(mpMode=snup
-								,mpTargetTableNm=&lmvResource.
-								,mpInputTableNm=work.&lmvResource._chkd_snup
-								);
-	/* Загружаем snap */
-	%cmn_load_etl_ia_artefacts(mpMode=snap
-								,mpTargetTableNm=&lmvResource.
-								,mpInputTableNm= work.tmp_&lmvResource._snap_hsh
-								);
-	
-	%if &SYSCC gt 4 %then %do;
-		/* Return session in execution mode */
-		OPTIONS NOSYNTAXCHECK OBS=MAX; 
-		proc sql noprint;
-			connect using etl_cfg;
-			execute by etl_cfg(
-				update etl_cfg.cfg_resource_registry
-				set status_cd='E'
-				where resource_id = &lmvResId. and status_cd in ('P') and uploaded_from_source is null and uploaded_to_target is null;
-			);
-		quit;
+		%let lmvHashDiffsLength = %member_obs(mpData=work.&lmvResource._hash_diffs);
+
+		%if &lmvHashDiffsLength gt 0 %then %do;
+			%put There are some difference in &lmvResource.;
+			data work.&lmvResource.(drop=rc hash_value_dttm_id);
+				length hash_value_dttm_id $32 pk_hash $32;;
+				if _n_=1 then do;
+					DECLARE HASH H (DATASET:"work.&lmvResource._hash_diffs");
+					RC=H.DEFINEKEY("hash_value_dttm_id");
+					RC=H.DEFINEDATA();
+					RC=H.DEFINEDONE();
+					call missing(hash_value_dttm_id);
+				end;
+				set tmp_&lmvResource._snap_hsh;
+				/* set etl_ia.&lmvResource.; */
+				pk_hash = SHA256HEX(catx('_', &lmvPkList.));
+				hash_value_dttm_id = SHA256HEX(catx('_',pk_hash,valid_from_dttm));
+				rc=h.find();
+				if (rc=0) then do;
+					valid_to_dttm = &lmvDateTime.;
+				end;
+			run;
+
+			%if &SYSCC gt 4 %then %do;
+				/* Return session in execution mode */
+				OPTIONS NOSYNTAXCHECK OBS=MAX;
+				proc sql noprint;
+					connect using etl_cfg;
+					execute by etl_cfg(
+						update etl_cfg.cfg_resource_registry
+						set status_cd='E'
+						where resource_id = &lmvResId. and status_cd in ('P') and  uploaded_to_target is null;
+					);
+				quit;
+				
+				%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
+				%abort;
+			%end;
+				
+			proc sql noprint;
+				connect using etl_ia;
+				%if %upcase(&lmvResTypeLoad.) eq FULL %then %do;
+					execute by etl_ia (
+						delete from etl_ia.&lmvResource.
+						where valid_to_dttm = &ETL_SCD_FUTURE_DTTM_DB.;
+					);
+				%end;
+				%else %if %upcase(&lmvResTypeLoad.) eq WINDOW %then %do;
+					execute by etl_ia (
+						delete from  etl_ia.&lmvResource.
+						where &lmvFieldTmFrame. >= current_date - &lmvTmFrameVal. and valid_to_dttm = &ETL_SCD_FUTURE_DTTM_DB.;
+						);
+				%end;
+			quit;
+			
+			/*Загружаем данные в целевую таблицу */
+			proc append base=etl_ia.&lmvResource.(&ETL_PG_BULKLOAD.) data=work.&lmvResource.(drop=pk_hash value_hash) force;
+			run;
+		%end;
 		
-		%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
-		%abort;
-	%end;
-	
-	/* Добавляем дельту к главной таблице*/
-	proc append base=etl_ia.&lmvResource. (&ETL_PG_BULKLOAD.) data=work.&lmvResource._chkd_dlt(drop=pk_hash value_hash) force;
-	run;
-	
-	/* Calc uploaded/updated rows */
-	%let lmvCntRowsTarget = %eval( %member_obs(mpData=work.tmp_&lmvResource._delta) + %member_obs(mpData=work.&lmvResource._hash_diffs) );
-	%let lmvCntUpdatedRows = %member_obs(mpData=work.&lmvResource._chkd_snup);
-	
-	%put Count of updated rows in table &lmvResource. = &lmvCntUpdatedRows. and count of uploaded rows  = &lmvCntRowsTarget.;
-	
-	%if &SYSCC gt 4 %then %do;
-		/* Return session in execution mode */
-		OPTIONS NOSYNTAXCHECK OBS=MAX;
-		proc sql noprint;
-			connect using etl_cfg;
-			execute by etl_cfg(
-				update etl_cfg.cfg_resource_registry
-				set status_cd='E'
-				where resource_id = &lmvResId. and status_cd in ('P') and uploaded_from_source is null and uploaded_to_target is null;
-			);
-		quit;
+		%if &SYSCC gt 4 %then %do;
+			/* Return session in execution mode */
+			OPTIONS NOSYNTAXCHECK OBS=MAX;
+			proc sql noprint;
+				connect using etl_cfg;
+				execute by etl_cfg(
+					update etl_cfg.cfg_resource_registry
+					set status_cd='E'
+					where resource_id = &lmvResId. and status_cd in ('P') and  uploaded_to_target is null;
+				);
+			quit;
+			
+			%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
+			%abort;
+		%end;
 		
-		%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
-		%abort;
+		/*Загружаем дельту */
+		%cmn_load_etl_ia_artefacts(mpMode=delta
+									,mpTargetTableNm=&lmvResource.
+									,mpInputTableNm=work.&lmvResource._chkd_dlt
+									);
+		/* Загружаем snup */
+
+		%cmn_load_etl_ia_artefacts(mpMode=snup
+									,mpTargetTableNm=&lmvResource.
+									,mpInputTableNm=work.&lmvResource._chkd_snup
+									);
+		/* Загружаем snap */
+		%cmn_load_etl_ia_artefacts(mpMode=snap
+									,mpTargetTableNm=&lmvResource.
+									,mpInputTableNm= work.tmp_&lmvResource._snap_hsh
+									);
+		
+		%if &SYSCC gt 4 %then %do;
+			/* Return session in execution mode */
+			OPTIONS NOSYNTAXCHECK OBS=MAX; 
+			proc sql noprint;
+				connect using etl_cfg;
+				execute by etl_cfg(
+					update etl_cfg.cfg_resource_registry
+					set status_cd='E'
+					where resource_id = &lmvResId. and status_cd in ('P') and  uploaded_to_target is null;
+				);
+			quit;
+			
+			%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
+			%abort;
+		%end;
+		
+		/* Добавляем дельту к главной таблице*/
+		proc append base=etl_ia.&lmvResource. (&ETL_PG_BULKLOAD.) data=work.&lmvResource._chkd_dlt(drop=pk_hash value_hash) force;
+		run;
+		
+		/* Calc uploaded/updated rows */
+		%let lmvCntRowsTarget = %eval( %member_obs(mpData=work.tmp_&lmvResource._delta) + %member_obs(mpData=work.&lmvResource._hash_diffs) );
+		%let lmvCntUpdatedRows = %member_obs(mpData=work.&lmvResource._chkd_snup);
+		
+		%put Count of updated rows in table &lmvResource. = &lmvCntUpdatedRows. and count of uploaded rows  = &lmvCntRowsTarget.;
+		
+		%if &SYSCC gt 4 %then %do;
+			/* Return session in execution mode */
+			OPTIONS NOSYNTAXCHECK OBS=MAX;
+			proc sql noprint;
+				connect using etl_cfg;
+				execute by etl_cfg(
+					update etl_cfg.cfg_resource_registry
+					set status_cd='E'
+					where resource_id = &lmvResId. and status_cd in ('P') and uploaded_to_target is null;
+				);
+			quit;
+			
+			%put ERROR: &lmvResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
+			%abort;
+		%end;
+	/* Конец блока загрузки по типу scd2 */
 	%end;
 	
 	proc sql noprint;
@@ -335,13 +379,14 @@
 		update etl_cfg.cfg_resource_registry 
 		set status_cd = 'L'
 			,uploaded_from_source=&lmvCntRowsSource.
-			,uploaded_to_target=&lmvCntRowsTarget.		
+			,uploaded_to_target=&lmvCntRowsTarget.
+			,updated=&lmvCntUpdatedRows.
 		where exec_dttm = (select max(exec_dttm) as max
 					from etl_cfg.cfg_resource_registry where resource_id = &lmvResId. and status_cd = 'P');
 		)
 	;
 	quit;
 	
-	%tech_log_event(mpMODE=END, mpPROCESS_NM=fmk_load_etl_ia_&lmvResource.);
+	%tech_log_event(mpMODE=END, mpPROCESS_NM=fmk_load_etl_ia_old_&lmvResource.);
 	
 %mend fmk_load_etl_ia_old;

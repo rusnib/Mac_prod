@@ -115,7 +115,7 @@
 	/*данные уже будут протянуты по дням*/
 	proc casutil;
 		promote casdata='pmix_sales_rest' incaslib='casuser' outcaslib='mn_long';
-		*save casdata="pmix_sales_rest" casout="pmix_sales_rest.sashdat" incaslib="mn_long" outcaslib="mn_long" replace compress;
+		save casdata="pmix_sales_rest" casout="pmix_sales_rest.sashdat" incaslib="mn_long" outcaslib="mn_long" replace;
 		droptable casdata='pmix_sales_rest' incaslib='CASUSER' quiet;
 		droptable casdata='TS_PMIX_SALES_day' incaslib='CASUSER' quiet;
 	run;

@@ -106,7 +106,7 @@
 	%member_names (mpTable=&mpOutGcLt, mpLibrefNameKey=lmvOutLibrefGcLt, mpMemberNameKey=lmvOutTabNameGcLt); 
 	%member_names (mpTable=&mpOutPmixLt, mpLibrefNameKey=lmvOutLibrefPmixLt, mpMemberNameKey=lmvOutTabNamePmixLt); 
 	%member_names (mpTable=&mpOutUptLt, mpLibrefNameKey=lmvOutLibrefUptLt, mpMemberNameKey=lmvOutTabNameUptLt); 
-
+			
 	%if &mpAuth. = YES %then %do;
 		%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
 		
@@ -130,15 +130,16 @@
 	%else %if &mpAuth. = NO %then %do;
 		%vf_get_project_list(mpOut=work.vf_project_list);
 	%end;
-	/* Извлечение ID для VF-проекта PMIX по его имени */
+	
+	/* пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ID пїЅпїЅпїЅ VF-пїЅпїЅпїЅпїЅпїЅпїЅпїЅ PMIX пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ */
 	%let lmvVfPmixName = &mpVfPmixProjName.;
 	%let lmvVfPmixId = %vf_get_project_id_by_name(mpName=&lmvVfPmixName., mpProjList=work.vf_project_list);
 	
-	/* Извлечение ID для VF-проекта PBO по его имени */
+	/* пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ID пїЅпїЅпїЅ VF-пїЅпїЅпїЅпїЅпїЅпїЅпїЅ PBO пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ */
 	%let lmvVfPboName = &mpVfPboProjName.;
 	%let lmvVfPboId = %vf_get_project_id_by_name(mpName=&lmvVfPboName., mpProjList=work.vf_project_list);
 	%let lmvInEventsMkup=&mpInEventsMkup;
-/* 0. Удаление целевых таблиц */
+/* 0. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ */
 	%if &mpPrmt. = Y %then %do;
 		proc casutil;
 			droptable casdata="&lmvOutTabNameGcSt." incaslib="&lmvOutLibrefGcSt." quiet;
@@ -156,7 +157,7 @@
 			droptable casdata="all_ml_train" incaslib="&lmvInLibref." quiet;
 		run;
 	%end;
-/*0.9 Вытащить данные из проекта*/
+/*0.9 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	proc fedsql sessref=casauto noprint;
 		create table &lmvOutLibrefOutfor..&lmvOutTabNameOutfor.{options replace=true} as
 			select t1.*
@@ -181,7 +182,7 @@
 	%end;
     
 
-/*1. применяем к недельным прогнозам недельные профили*/
+/*1. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	%vf_apply_w_prof(&lmvOutLibrefOutfor..&lmvOutTabNameOutfor.,
 					&lmvOutLibrefOutfor..&lmvOutTabNameOutforgc.,
 					casuser.nnet_wp_scored1,
@@ -214,9 +215,9 @@
 	  end;
 	run;
 
-/*1.5 Прогноз новых товаров*/
-  %vf_new_product(mpInCaslib=&lmvInLibref.);
-/*2. Объединяем таблицы долгосрочного прогноза и краткосрочного - с приоритетом краткосрочного*/
+/*1.5 пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
+  *%vf_new_product(mpInCaslib=&lmvInLibref.);
+/*2. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	data casuser.promo_w2;
 	  set casuser.promo_d; /*table from vf_apply_w_prof*/
 	  format period_dt date9.;
@@ -233,7 +234,7 @@
 	  from casuser.promo_w2 t1;
 	quit;
 
-	/*Сводим краткосрочный и долгосрочный (по дням) прогноз с приоритетом краткосрочн.*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅ пїЅпїЅпїЅпїЅ) пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.*/
   proc fedsql sessref=casauto;
    create table casuser.pmix_daily{options replace=true} as
 		select 
@@ -255,9 +256,14 @@
             t1.period_dt = t4.sales_dt and t1.channel_cd=t4.channel_cd
    ;
    quit;
-
-	/*2.1 TODO: вычисление матриц временных закрытий и допустимых дней продаж*/
-	data casuser.days_pbo_date_close; /*дни когда пбо будет уже закрыт (навсегда)*/
+   
+   proc casutil;
+			droptable casdata="pmix_daily_" incaslib="casuser" quiet;
+	run;
+	quit;
+	
+	/*2.1 TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ*/
+	data casuser.days_pbo_date_close; /*пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)*/
 	  set &lmvInLibref..pbo_dictionary;
 	  format period_dt date9.;
 	  keep PBO_LOCATION_ID CHANNEL_CD period_dt;
@@ -268,7 +274,7 @@
 	  end;
 	run;
 	
-	data casuser.days_pbo_close; /*дни когда пбо будет временно закрыт*/
+	data casuser.days_pbo_close; /*пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ*/
 	  *set &lmvPBOCloseTab.;
 	  set &lmvInLibref..PBO_CLOSE_PERIOD;
 	  format period_dt date9.;
@@ -283,16 +289,16 @@
 	  end;
 	run;
 	
-	data casuser.days_pbo_close(append=force); /*дни когда закрыто ПБО - никаких продаж быть не должно*/
+	data casuser.days_pbo_close(append=force); /*пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ*/
 	  set casuser.days_pbo_date_close;
 	run;
 	
-	proc fedsql sessref=casauto; /*убираем дубликаты*/
+	proc fedsql sessref=casauto; /*пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	create table casuser.days_pbo_close{options replace=true} as
 	select distinct * from casuser.days_pbo_close;
 	quit;
 
-/*2.2 TODO: обработка замен T*/
+/*2.2 TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ T*/
 	proc fedsql sessref=casauto;
 		create table casuser.plm_t{options replace=true} as
 		select LIFECYCLE_CD, PREDECESSOR_DIM2_ID, PREDECESSOR_PRODUCT_ID,
@@ -303,13 +309,14 @@
 		from &lmvInLibref..PRODUCT_CHAIN
 		where LIFECYCLE_CD='T' 
 		and coalesce(PREDECESSOR_END_DT,cast(intnx('day',SUCCESSOR_START_DT,-1) as date))<=date %tslit(&vf_fc_agg_end_dt)
-		and successor_start_dt>=intnx('month',&vf_fc_start_dt,-3);
-		/*фильтр, отсекающий "старые" замены 
-		Замены случившиеся больше 3 мес назад отсекаются 
-		Замены позднее fc_agg_end_dt отсекаем*/
+		/* and successor_start_dt>=intnx('month',&vf_fc_start_dt,-3); */
+		and successor_start_dt>=intnx('month',&vf_fc_start_dt,-8);
+		/*пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ "пїЅпїЅпїЅпїЅпїЅпїЅ" пїЅпїЅпїЅпїЅпїЅпїЅ 
+		пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ 3 пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 
+		пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ fc_agg_end_dt пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	quit;
 
-    /*predcessor будет продаваться до predecessor_end_dt (включ), все остальные даты ПОСЛЕ удаляем*/
+    /*predcessor пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ predecessor_end_dt (пїЅпїЅпїЅпїЅпїЅ), пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
     proc fedsql sessref=casauto; 
 		create table casuser.predessor_periods_t{options replace=true} as
 		select PREDECESSOR_DIM2_ID as pbo_location_id,
@@ -319,7 +326,7 @@
 		;
 	quit;
 
-/*2.3 TODO: обработка выводов D*/
+/*2.3 TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ D*/
 	proc fedsql sessref=casauto;
 		create table casuser.plm_d{options replace=true} as
 		select LIFECYCLE_CD, PREDECESSOR_DIM2_ID, PREDECESSOR_PRODUCT_ID,
@@ -329,52 +336,75 @@
 		from &lmvInLibref..PRODUCT_CHAIN
 		where LIFECYCLE_CD='D'
 		and predecessor_end_dt<=date %tslit(&vf_fc_agg_end_dt);
-		/*старые выводы не отсекаем
-		  выводы позднее fc_agg_end_dt отсекаем*/
+		/*пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+		  пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ fc_agg_end_dt пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	quit;
 
-/*2.4 TODO: insert-update новых товаров по дням по ключу в pmix_daily до PLM
-		с приоритетом новых товаров*/
-	proc fedsql sessref=casauto;
-		create table casuser.pmix_daily_new{options replace=true} as
-		select 
-		coalesce(t1.SALES_DT,t2.period_dt) as period_dt,
-		coalesce(t1.product_id,t2.PRODUCT_ID) as product_id,
-		coalesce(t1.channel_cd,t2.channel_cd) as channel_cd, 
-		coalesce(t1.pbo_location_id,t2.PBO_LOCATION_ID) as PBO_LOCATION_ID, 
-		coalesce(cast(intnx('month',t1.sales_dt,0) as date),t2.mon_dt) as mon_dt,
-		coalesce(t1.P_SUM_QTY,t2.ff) as ff
-		from casuser.npf_prediction t1 full outer join casuser.pmix_daily t2
-			on t1.SALES_DT =t2.period_dt and t1.product_id=t2.product_id and 
-			t1.channel_cd=t2.channel_cd and t1.pbo_location_id=t2.pbo_location_id
-		;
-	quit;
-
+/*2.4 TODO: insert-update пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ pmix_daily пїЅпїЅ PLM
+		пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
+	%if %sysfunc(exist(casuser.npf_prediction)) eq 0 %then %do;
+		
+		proc fedsql sessref=casauto;
+			create table casuser.pmix_daily_new{options replace=true} as
+			select 
+			t2.period_dt,
+			t2.PRODUCT_ID,
+			t2.channel_cd, 
+			t2.PBO_LOCATION_ID, 
+			t2.mon_dt,
+			t2.ff
+			from casuser.pmix_daily t2
+			;
+		quit;
+	%end;
+	%else %do;
+		proc fedsql sessref=casauto;
+			create table casuser.pmix_daily_new{options replace=true} as
+			select 
+			coalesce(t1.SALES_DT,t2.period_dt) as period_dt,
+			coalesce(t1.product_id,t2.PRODUCT_ID) as product_id,
+			coalesce(t1.channel_cd,t2.channel_cd) as channel_cd, 
+			coalesce(t1.pbo_location_id,t2.PBO_LOCATION_ID) as PBO_LOCATION_ID, 
+			coalesce(cast(intnx('month',t1.sales_dt,0) as date),t2.mon_dt) as mon_dt,
+			coalesce(t1.P_SUM_QTY,t2.ff) as ff
+			from casuser.npf_prediction t1 full outer join casuser.pmix_daily t2
+				on t1.SALES_DT =t2.period_dt and t1.product_id=t2.product_id and 
+				t1.channel_cd=t2.channel_cd and t1.pbo_location_id=t2.pbo_location_id
+			;
+		quit;
+	%end;
 	
-/*2.51 Добавление в АМ информации из новинок */
+	 proc casutil;
+			droptable casdata="pmix_daily" incaslib="casuser" quiet;
+	run;
+	quit;
+	
+/*2.51 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ */
 	proc fedsql sessref=casauto;
 		create table casuser.AM_new{options replace=true} as
 		select product_id,pbo_location_id, start_dt,end_dt
 		from &lmvInLibref..ASSORT_MATRIX t1;
 	quit;
     
-    data casuser.AM_new(append=yes);
-		set casuser.future_product_chain(rename=(period_start_dt=start_dt 
-												period_end_dt=end_dt));
-	run;
+	%if %sysfunc(exist(casuser.future_product_chain)) ne 0 %then %do;
+		data casuser.AM_new(append=yes);
+			set casuser.future_product_chain(rename=(period_start_dt=start_dt 
+													period_end_dt=end_dt));
+		run;
+	%end;
 
-/*2.52 TODO: применение T,D PLM к прогнозам casuser.pmix_daily + новые товары, 
-		учет таблиц постоянных+временных закрытий*/
-	/*формирование таблицы товар-ПБО-день, которые должны быть в прогнозе - на основании АМ*/
+/*2.52 TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ T,D PLM пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ casuser.pmix_daily + пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, 
+		пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ+пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ*/
 	proc fedsql sessref=casauto;
 		create table casuser.plm_dist{options replace=true} as
 		select pbo_location_id,product_id, start_dt,end_dt
 		from casuser.AM_new
 		where start_dt between &vf_fc_start_dt and date %tslit(&vf_fc_agg_end_dt)
-			  or &vf_fc_start_dt between start_dt and end_dt; /*нужны записи AM, пересекающиеся с периодом прогнозирования*/
+			  or &vf_fc_start_dt between start_dt and end_dt; /*пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ AM, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	quit;
 	
-	data casuser.days_prod_sale; /*Дни когда товар должен продаваться по информации из АМ*/
+	data casuser.days_prod_sale; /*пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅ*/
 	  set casuser.plm_dist;
 	  format period_dt date9.;
 	  keep PBO_LOCATION_ID PRODUCT_ID period_dt;
@@ -382,16 +412,26 @@
 	    output;
 	  end;
 	run;
+	
+	proc casutil;
+			droptable casdata="plm_dist" incaslib="casuser" quiet;
+	run;
+	quit;
 
-	/*удалить дубликаты*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	data casuser.days_prod_sale1;
 		set casuser.days_prod_sale;
 		by PBO_LOCATION_ID PRODUCT_ID period_dt;
 		if first.period_dt then output;
 	run;
 	
+	proc casutil;
+		droptable casdata="days_prod_sale" incaslib="casuser" quiet;
+	run;
+	quit;
+	
 	proc fedsql sessref=casauto;
-	  /*удалить отсюда периоды D */
+	  /*пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ D */
 	  create table casuser.plm_sales_mask{options replace=true} as
 	  select t1.PBO_LOCATION_ID, t1.PRODUCT_ID, t1.period_dt
 	  from  casuser.days_prod_sale1 t1 left join casuser.plm_d t2
@@ -399,28 +439,38 @@
 	  where t1.period_dt<coalesce(t2.PREDECESSOR_END_DT,cast(intnx('day',date %tslit(&vf_fc_agg_end_dt),1) as date));
 	quit;
 	
+	proc casutil;
+		droptable casdata="days_prod_sale1" incaslib="casuser" quiet;
+	run;
+	quit;
+	
 	proc fedsql sessref=casauto;
-	  /*удалить отсюда периоды временного и постоянного закрытия ПБО */
+	  /*пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ */
 	  create table casuser.plm_sales_mask1{options replace=true} as
 		  select t1.PBO_LOCATION_ID, t1.PRODUCT_ID, t1.period_dt
 		  from  casuser.plm_sales_mask t1 left join casuser.DAYS_PBO_CLOSE t3
 		  on t1.pbo_location_id=t3.pbo_location_id and t1.period_dt=t3.period_dt
-		  /*пересечь с casuser.days_pbo_close - 
-		  когда ПБО закрыт по любым причинам,
-		  эти дни не должны попадать в неё по ключу ПБО - канал*/
+		  /*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ casuser.days_pbo_close - 
+		  пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ,
+		  пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅ*/
 		  left join casuser.predessor_periods_t t4
 		  on t1.pbo_location_id=t4.pbo_location_id and t1.product_id=t4.product_id
-		/*из plm_sales_mask1 удаляем для predcessor периоды с датой >end_dt*/
+		/*пїЅпїЅ plm_sales_mask1 пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ predcessor пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ >end_dt*/
 		  where t3.pbo_location_id is null and t3.period_dt is null
 		  and ((t1.period_dt<=t4.end_dt and t4.end_dt is not null) or t4.end_dt=.)
-		   /*если ряд есть в predcessor - оставляем всё <=даты вывода, если нет - не смотрим на дату*/
+		   /*пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ predcessor - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ <=пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ - пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ*/
 	;
 	quit;
+	
+	proc casutil;
+		droptable casdata="plm_sales_mask" incaslib="casuser" quiet;
+	run;
+	quit;
 /*=-==========================-*/
-/* вообще это надо перенести в предобработку и копировать историю под новыми id 
-   но тогда мы портим историю и нельзя применять иерархическое прогнозирование?*/
-    proc fedsql sessref=casauto; /*создаём дубликаты прогнозов, копируя predesessor
-								под id successor*/
+/* пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ id 
+   пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ?*/
+    proc fedsql sessref=casauto; /*пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ predesessor
+								пїЅпїЅпїЅ id successor*/
 		create table casuser.successor_fc{options replace=true} as
 			select
 			t1.period_DT,
@@ -433,9 +483,9 @@
 			t1.PRODUCT_ID=t2.PREDECESSOR_PRODUCT_ID and t1.PBO_LOCATION_ID=PREDECESSOR_DIM2_ID
 			where t1.period_dt>=successor_start_dt;
 	quit;
-/*добавить замены в pmix_daily_new, 
- Не append! Приоритет у successor_fc! 
- флаг промо для замены? - оставляем из predcessor*/
+/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ pmix_daily_new, 
+ пїЅпїЅ append! пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ successor_fc! 
+ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ? - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ predcessor*/
 	*data casuser.pmix_daily_new(append=force); 
 	*  set casuser.successor_fc;
 	*run;
@@ -453,27 +503,33 @@
 	;
 	quit;
 
-/*TODO: рассчитать таблицу с флагом промо, добавить её к финальной таблице pmix*/
+/*TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ pmix*/
 	proc casutil;
 			droptable casdata="fc_w_plm" incaslib="casuser" quiet;
+			droptable casdata="successor_fc" incaslib="casuser" quiet;
+			droptable casdata="pmix_daily_new" incaslib="casuser" quiet;
 	run;
 	
-	proc fedsql sessref=casauto; /*наложение plm на прогноз*/
+	proc fedsql sessref=casauto; /*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ plm пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 		create table casuser.fc_w_plm{options replace=true} as 
 			select t1.CHANNEL_CD,t1.PBO_LOCATION_ID,t1.PRODUCT_ID,t1.period_dt,
 			t1.FF,
 			coalesce(tpr.promo,0) as promo
-			from casuser.pmix_daily_new_ t1 inner join casuser.plm_sales_mask1 t2 /*дни когда товар ДОЛЖЕН продаваться*/
+			from casuser.pmix_daily_new_ t1 inner join casuser.plm_sales_mask1 t2 /*пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 			on t1.PBO_LOCATION_ID=t2.PBO_LOCATION_ID and t1.PRODUCT_ID=t2.PRODUCT_ID and t1.period_dt=t2.period_dt
 			left join casuser.promo_w1 tpr 
 			on tpr.channel_cd=t1.channel_cd and tpr.pbo_location_id=t1.PBO_LOCATION_ID and
 				tpr.product_id=t1.PRODUCT_ID and tpr.period_dt=t1.period_dt
 			;
 	quit;
+	
+	proc casutil;
+			droptable casdata="plm_sales_mask1" incaslib="casuser" quiet;
+	run;
 
-/*2.6 TODO: прогнозы GC от отдела развития - добавить к прогнозу GC insert-update*/
+/*2.6 TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC insert-update*/
 
-/*2.7 TODO: Применение таблицы постоянных+временных закрытий к прогнозам GC*/
+/*2.7 TODO: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ+пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC*/
 	proc fedsql sessref=casauto;
 		create table casuser.fc_w_plm_gc{options replace=true} as 
 			select t1.CHANNEL_CD,t1.PBO_LOCATION_ID,t1.period_dt,FF
@@ -481,12 +537,12 @@
 			on t1.PBO_LOCATION_ID=t2.PBO_LOCATION_ID and t1.period_dt=t2.period_dt 
 			   and t1.CHANNEL_CD=t2.CHANNEL_CD
 			where t2.PBO_LOCATION_ID is null and t2.period_dt is null
-			   and t2.CHANNEL_CD  is null /*не должно быть инфо о закрытии*/
+			   and t2.CHANNEL_CD  is null /*пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 			;
 	quit;
 
-/*3. Вычисление цен на будущее*/
-	/*приводим к ценам по дням*/
+/*3. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ*/
 	data casuser.price_unfolded;
 	 set &lmvInLibref..PRICE_ML; 
 	 where price_type='F';
@@ -497,7 +553,7 @@
 	 end;
 	run;
 
-	/*избавляемся от возможных дубликатов цен по ключу товар-пбо-дата*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ*/
 	data casuser.price_nodup;
 	  set casuser.price_unfolded;
 	  by product_id pbo_location_id sales_dt;
@@ -509,7 +565,7 @@
 	run;
 	quit;
 	 
-	/*протягиваем неизвестные цены последним известным значением до горизонта прогнозирования*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	proc cas;
 	timeData.timeSeries result =r /
 		series={{name="gross_price_amt", setmiss="prev"},
@@ -535,33 +591,42 @@
 		quit;
 	%end;
 
-/*4. Формирование таблиц по дням*/
+	proc casutil;
+		save incaslib="casuser" outcaslib="mn_short" casdata="TS_price_fact" casout="TS_price_fact.sashdat" replace;
+		
+		save incaslib="casuser" outcaslib="mn_short" casdata="fc_w_plm" casout="fc_w_plm.sashdat" replace;
+		
+		save incaslib="casuser" outcaslib="mn_short" casdata="fc_w_plm_gc" casout="fc_w_plm_gc.sashdat" replace;
+	run;
+	quit;
+	
+/*4. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ*/
 /*4.1 Units*/
 	proc fedsql sessref=casauto;
 	create table &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt.{options replace=true} as
 		select distinct
-			cast(t1.product_id as integer) as PROD /*– ИД продукта*/,
-			cast(t1.pbo_location_id as integer) as LOCATION /*– ИД ресторана*/,
-			t1.period_dt as DATA /*– Дата прогноза или факта (день)*/,
-			'RUR' as CURRENCY /*– Валюта, значение по умолчанию RUR*/,
-			'CORP' as ORG /*– Организация, значение по умолчанию CORP*/,
+			cast(t1.product_id as integer) as PROD /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			cast(t1.pbo_location_id as integer) as LOCATION /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			t1.period_dt as DATA /*пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ)*/,
+			'RUR' as CURRENCY /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ RUR*/,
+			/*'CORP' as ORG пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ CORP*/
 			case when promo=0 then t1.FF else 0 end
-			as BASE_FCST_QNT_DAY /*– базовый прогноз (заполняется, если в этом разрезе 
-							товар-ПБО-день не было ни одной промо-акции, =0 иначе)*/,
+			as BASE_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 
+							пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅ, =0 пїЅпїЅпїЅпїЅпїЅ)*/,
 			case when t1.promo=1 then t1.FF else 0 end
-			as PROMO_FCST_QNT_DAY /*– прогноз промо (заполняется, если в этом разрезе 
-							товар-ПБО-день была одна и более промо-акций, =0 иначе)*/,
-			t1.FF as TOTAL_FCST_QNT_DAY /*– сумма прогноза базового и промо*/,
-			t1.FF as OVERRIDED_FCST_QNT_DAY /*– сумма прогноза базового и промо (чем отличается от предыдущей строки?)*/,
-			1 as OVERRIDE_TRIGGER_QNT_DAY /*– тригер оверрайда, по умолчанию значение 1*/,
-			case when promo=0 then t1.ff*t2.gross_price_amt else 0 end
-			as BASE_FCST_RUR_DAY /*– базовый прогноз в РУБ (для пересчета штук в рубли используется net-цена? 
-						Или gross? заполняется, если в этом разрезе товар-ПБО-день нет ни одной промо-акции)*/,
-			case when promo=1 then t1.ff*t2.gross_price_amt else 0 end
-			as PROMO_FCST_RUR_DAY /*– промо прогноз в РУБ (заполняется, если в этом разрезе товар-ПБО-день есть одна и более промо-акций)*/,
-			t1.ff*t2.gross_price_amt as TOTAL_FCST_RUR_DAY /*– суммарный прогноз в РУБ*/,
-			t1.ff*t2.gross_price_amt as OVERRIDED_FCST_RUR_DAY /*– Прогноз с учетом оверрйда РУБ (считается в ETL путем умножения средней цены на прогноз с учетом оверрайдов).*/,
-			t2.gross_price_amt as AVG_PRICE /*– средняя цена. Считается в ETL как отношение прогноз в руб/прогноз в шт в разрезе СКЮ/ПБО*/
+			as PROMO_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 
+							пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅ, =0 пїЅпїЅпїЅпїЅпїЅ)*/,
+			t1.FF as FINAL_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			t1.FF as OVERRIDED_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ?)*/,
+			1 as OVERRIDE_TRIGGER /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 1*/,
+			case when promo=0 then t1.ff*t2.net_price_amt else 0 end
+			as BASE_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ (пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ net-пїЅпїЅпїЅпїЅ? 
+						пїЅпїЅпїЅ gross? пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅ)*/,
+			case when promo=1 then t1.ff*t2.net_price_amt else 0 end
+			as PROMO_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅ)*/,
+			t1.ff*t2.net_price_amt as FINAL_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ*/,
+			t1.ff*t2.net_price_amt as OVERRIDED_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ ETL пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ).*/,
+			t2.net_price_amt as AVG_PRICE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ ETL пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ/пїЅпїЅпїЅ*/
 			from casuser.fc_w_plm t1 left join casuser.ts_price_fact t2 on
 			t1.product_id=t2.product_id and t1.pbo_location_id=t2.pbo_location_id and
 			   t1.period_dt=t2.sales_dt
@@ -572,45 +637,45 @@
 	proc fedsql sessref=casauto;
 	create table &lmvOutLibrefGcSt..&lmvOutTabNameGcSt.{options replace=true} as
 		select distinct
-			1 as PROD /*– ИД продукта на верхнем уровне (ALL Product, значение = 1)*/,
-			cast(pbo_location_id as integer) as LOCATION /*– ИД ресторана*/,
-			period_dt as DATA /*– Дата прогноза или факта (день)*/,
-			'RUR' as CURRENCY /*– Валюта, значение по умолчанию RUR*/,
-			'CORP' as ORG /*– Организация, значение по умолчанию CORP*/,
-			FF as BASE_FCST_GC_DAY /*– базовый прогноз */,
-			0 as PROMO_FCST_GC_DAY /*– прогноз промо*/,
-			FF as TOTAL_FCST_GC_DAY /*– сумма прогноза базового и промо*/,
-			FF as OVERRIDED_FCST_GC_DAY /*– сумма прогноза базового и промо с учетом оверрайдов*/,
-			1 as OVERRIDE_TRIGGER_GC_D /*– тригер оверрайда, по умолчанию значение 1*/
+			1 as PROD /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (ALL Product, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ = 1)*/,
+			cast(pbo_location_id as integer) as LOCATION /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			period_dt as DATA /*пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ)*/,
+			'RUR' as CURRENCY /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ RUR*/,
+			/*'CORP' as ORG пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ CORP*/
+			FF as BASE_FCST_GC /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ */,
+			0 as PROMO_FCST_GC /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			FF as FINAL_FCST_GC /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			FF as OVERRIDED_FCST_GC /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			1 as OVERRIDE_TRIGGER /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 1*/
 			from casuser.fc_w_plm_gc
 			where channel_cd='ALL' and period_dt between &VF_FC_START_DT and &VF_FC_END_SHORT_DT;
 	quit;
 
-/*4.3 UPT по дням*/
-	/*Прогноз UPT рассчитывается из прогноза в ШТ и GC по формуле
-	Прогноз UPT(Товар, ПБО, день) = Прогноз в ШТ(Товар, ПБО, день)/Прогноз GC(ПБО, день)*1000
+/*4.3 UPT пїЅпїЅ пїЅпїЅпїЅпїЅ*/
+	/*пїЅпїЅпїЅпїЅпїЅпїЅпїЅ UPT пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅ GC пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+	пїЅпїЅпїЅпїЅпїЅпїЅпїЅ UPT(пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ) = пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ(пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ)/пїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC(пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ)*1000
 	*/
 	proc fedsql sessref=casauto;
 	create table &lmvOutLibrefUptSt..&lmvOutTabNameUptSt.{options replace=true} as
 		select distinct
-			cast(t1.prod as integer) as PROD /*– ИД продукта на верхнем уровне (ALL Product, значение = 1) */,
-			cast(t1.location as integer) as LOCATION /*– ИД ресторана*/,
-			t1.data as DATA /*– Дата прогноза или факта (день)*/,
-			'RUR' as CURRENCY /*– Валюта, значение по умолчанию RUR*/,
-			'CORP' as ORG /*– Организация, значение по умолчанию CORP*/,
-		case when t2.BASE_FCST_GC_DAY is not null and abs(t2.BASE_FCST_GC_DAY)> 1e-5 
-		   then t1.BASE_FCST_QNT_DAY/t2.BASE_FCST_GC_DAY*1000 
+			cast(t1.prod as integer) as PROD /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (ALL Product, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ = 1) */,
+			cast(t1.location as integer) as LOCATION /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			t1.data as DATA /*пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ)*/,
+			'RUR' as CURRENCY /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ RUR*/,
+			/*'CORP' as ORG пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ CORP*/
+		case when t2.BASE_FCST_GC is not null and abs(t2.BASE_FCST_GC)> 1e-5 
+		   then t1.BASE_FCST_UNITS/t2.BASE_FCST_GC*1000 
 		   else 0
 		   end
-		   as BASE_FCST_UPT_DAY /*– базовый прогноз, = Прогноз в ШТ(Товар, ПБО, день)/Прогноз GC(ПБО, день)*1000,
-						если в разрезе Товар-ПБО-день нет ни одной промо-акции, =0 иначе.*/,
-		case when t2.BASE_FCST_GC_DAY is not null and abs(t2.BASE_FCST_GC_DAY)> 1e-5
-		   then t1.PROMO_FCST_QNT_DAY/t2.BASE_FCST_GC_DAY*1000 
+		   as BASE_FCST_UPT /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, = пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ(пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ)/пїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC(пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ)*1000,
+						пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅ, =0 пїЅпїЅпїЅпїЅпїЅ.*/,
+		case when t2.BASE_FCST_GC is not null and abs(t2.BASE_FCST_GC)> 1e-5
+		   then t1.PROMO_FCST_UNITS/t2.BASE_FCST_GC*1000 
 		   else 0
 		   end
-		   as PROMO_FCST_UPT_DAY /*– прогноз промо, = Прогноз в ШТ(Товар, ПБО, день)/Прогноз GC(ПБО, день)*1000, 
-						если в разрезе Товар-ПБО-день есть одна или более промо-акций, =0 иначе.*/,
-		   1 as OVERRIDE_TRIGGER_UPT_D /*– тригер оверрайда, по умолчанию значение 1*/
+		   as PROMO_FCST_UPT /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, = пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ(пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ)/пїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC(пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ)*1000, 
+						пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅ-пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅ, =0 пїЅпїЅпїЅпїЅпїЅ.*/,
+		   1 as OVERRIDE_TRIGGER_D /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 1*/
 		from &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt. t1 left join &lmvOutLibrefGcSt..&lmvOutTabNameGcSt. t2
 		  on t1.location=t2.location and t1.data=t2.data;
 	quit;
@@ -627,92 +692,96 @@
 		quit;
 	%end;
 
-/*5. Агрегация до месяцев GC, UPT, Pmix, до макс горизонта долгосрочного прогнза*/
+/*5. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ GC, UPT, Pmix, пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/
 	%if &mpPrmt. = Y %then %do;
 		proc casutil;
-		droptable casdata="&lmvOutTabNameGcLt." incaslib="&lmvOutLibrefGcLt." quiet;
-		droptable casdata="&lmvOutTabNameUptLt." incaslib="&lmvOutLibrefUptLt." quiet;
-		droptable casdata="&lmvOutTabNamePmixLt." incaslib="&lmvOutLibrefPmixLt." quiet;
+			droptable casdata="&lmvOutTabNameGcLt." incaslib="&lmvOutLibrefGcLt." quiet;
+			droptable casdata="&lmvOutTabNameUptLt." incaslib="&lmvOutLibrefUptLt." quiet;
+			droptable casdata="&lmvOutTabNamePmixLt." incaslib="&lmvOutLibrefPmixLt." quiet;
+			droptable casdata="&lmvOutTabNameOutfor." incaslib="&lmvOutLibrefOutfor." quiet;
+			droptable casdata="&lmvOutTabNameOutforgc." incaslib="&lmvOutLibrefOutforgc." quiet;
 		quit;
+		
 	%end;
+	
 /*5.1 Units*/
 	proc fedsql sessref=casauto;
 		create table &lmvOutLibrefPmixLt..&lmvOutTabNamePmixLt.{options replace=true} as
 			select distinct
-			cast(t1.product_id as integer) as PROD /*– ИД продукта*/,
-			cast(t1.pbo_location_id as integer) as LOCATION /*– ИД ресторана*/,
-			cast(intnx('month',t1.period_dt,0,'b') as date) as DATA /*– Месяц прогноза или факта в формате (дата 1-го числа месяца прогноза или факта).*/,
-			'RUR' as CURRENCY /*– Валюта, значение по умолчанию RUR*/,
-			'CORP' as ORG /*– Организация, значение по умолчанию CORP*/,
+			cast(t1.product_id as integer) as PROD /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			cast(t1.pbo_location_id as integer) as LOCATION /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			cast(intnx('month',t1.period_dt,0,'b') as date) as DATA /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ 1-пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ).*/,
+			'RUR' as CURRENCY /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ RUR*/,
+			/*'CORP' as ORG пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ CORP*/
 			sum(case when promo=0 then t1.FF else 0 end) 
-			   as BASE_FCST_QNT_MON /*– базовый прогноз*/,
+			   as BASE_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
 			sum(case when promo=1 then t1.FF else 0 end)
-			   as PROMO_FCST_QNT_MON /*– прогноз промо*/,
-			sum(FF) as TOTAL_FCST_QNT_MON /*– сумма прогноза базового и промо*/,
-			sum(FF) as OVERRIDED_FCST_QNT_MON /*– сумма прогноза базового и промо*/,
-			1 as OVERRIDE_TRIGGER_QNT_MON /*– тригер оверрайда, по умолчанию значение 1*/,
-			sum(case when promo=0 then t1.ff*t2.gross_price_amt else 0 end)
-			   as BASE_FCST_RUR_MON /*– базовый прогноз в РУБ*/,
-			sum(case when promo=1 then t1.ff*t2.gross_price_amt else 0 end)
-			   as PROMO_FCST_RUR_MON /*– промо прогноз в РУБ*/,
-			sum(t1.ff*t2.gross_price_amt)
-			   as TOTAL_FCST_RUR_MON /*– суммарный прогноз в РУБ*/,
-			sum(t1.ff*t2.gross_price_amt)
-			   as OVERRIDED_FCST_RUR_MON /*– Прогноз с учетом оверрйда РУБ (считается в ETL путем умножения средней цены на прогноз с учетом оверрайдов).*/,
-			case when abs(sum(t1.ff))>1e-5 then sum(t1.ff*t2.gross_price_amt)/sum(t1.ff) else 0 end
-			   as AVG_PRICE /*– средняя цена. Считается в ETL как отношение прогноз в руб/прогноз в шт в разрезе СКЮ/ПБО*/
+			   as PROMO_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			sum(FF) as FINAL_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			sum(FF) as OVERRIDED_FCST_UNITS /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			1 as OVERRIDE_TRIGGER /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 1*/,
+			sum(case when promo=0 then t1.ff*t2.net_price_amt else 0 end)
+			   as BASE_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ*/,
+			sum(case when promo=1 then t1.ff*t2.net_price_amt else 0 end)
+			   as PROMO_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ*/,
+			sum(t1.ff*t2.net_price_amt)
+			   as FINAL_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ*/,
+			sum(t1.ff*t2.net_price_amt)
+			   as OVERRIDED_FCST_SALE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ ETL пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ).*/,
+			case when abs(sum(t1.ff))>1e-5 then sum(t1.ff*t2.net_price_amt)/sum(t1.ff) else 0 end
+			   as AVG_PRICE /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ ETL пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ/пїЅпїЅпїЅ*/
 			from casuser.fc_w_plm t1 left join casuser.ts_price_fact t2 on
 				t1.product_id=t2.product_id and t1.pbo_location_id=t2.pbo_location_id and
 				   t1.period_dt=t2.sales_dt
 				where t1.channel_cd='ALL' 
-				group by 1,2,3,4,5;
+				group by 1,2,3,4;
 	quit;
 /*5.2 GC*/
 	proc fedsql sessref=casauto;
 		create table &lmvOutLibrefGcLt..&lmvOutTabNameGcLt.{options replace=true} as
 			select distinct
-			1 as PROD /*– ИД продукта на верхнем уровне (ALL Product, значение = 1)*/,
-			cast(t1.pbo_location_id as integer) as LOCATION /*– ИД ресторана*/,
-			cast(intnx('month',t1.period_dt,0,'b') as date) as DATA /*– Дата прогноза или факта (месяц)*/,
-			'RUR' as CURRENCY /*– Валюта, значение по умолчанию RUR*/,
-			'CORP' as ORG /*– Организация, значение по умолчанию CORP*/,
-			sum(t1.ff) as BASE_FORECAST_GC_M /*– базовый прогноз по чекам*/,
-			sum(t1.ff) as OVERRIDED_FCST_GC /*– базовый прогноз по чекам (плюс логика сохранения оверрайдов)*/,
-			1 as OVERRIDE_TRIGGER /*– тригер оверрайда, по умолчанию значение 1*/
+			1 as PROD /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (ALL Product, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ = 1)*/,
+			cast(t1.pbo_location_id as integer) as LOCATION /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			cast(intnx('month',t1.period_dt,0,'b') as date) as DATA /*пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅ)*/,
+			'RUR' as CURRENCY /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ RUR*/,
+			/*'CORP' as ORG пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ CORP*/
+			sum(t1.ff) as BASE_FCST_GC /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ*/,
+			sum(t1.ff) as OVERRIDED_FCST_GC /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)*/,
+			1 as OVERRIDE_TRIGGER /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 1*/
 			from casuser.fc_w_plm_gc t1
 				where channel_cd='ALL'
-				group by 1,2,3,4,5;
+				group by 1,2,3,4;
 	quit;
 /*5.3 UPT*/
 	proc fedsql sessref=casauto;
 		create table &lmvOutLibrefUptLt..&lmvOutTabNameUptLt.{options replace=true} as
 			select distinct
-			cast(t1.prod as integer) as PROD /*– ИД продукта*/, 
-			cast(t1.location as integer) as LOCATION /*– ИД ресторана*/,
-			t1.data as DATA /*– Дата прогноза или факта (месяц)*/,
-			'RUR' as CURRENCY /*– Валюта, значение по умолчанию RUR*/,
-			'CORP' as ORG /*– Организация, значение по умолчанию CORP*/,
-			case when t2.BASE_FORECAST_GC_M is not null and abs(t2.BASE_FORECAST_GC_M)>1e-5 
-			   then t1.BASE_FCST_QNT_MON/t2.BASE_FORECAST_GC_M*1000 
+			cast(t1.prod as integer) as PROD /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/, 
+			cast(t1.location as integer) as LOCATION /*пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			t1.data as DATA /*пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅ)*/,
+			'RUR' as CURRENCY /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ RUR*/,
+			/*'CORP' as ORG пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ CORP*/
+			case when t2.BASE_FCST_GC is not null and abs(t2.BASE_FCST_GC)>1e-5 
+			   then t1.BASE_FCST_UNITS/t2.BASE_FCST_GC*1000 
 			   else 0
 			   end
-			   as BASE_FCST_UPT /*– базовый прогноз*/,
-			case when t2.BASE_FORECAST_GC_M is not null and abs(t2.BASE_FORECAST_GC_M)>1e-5 
-			   then t1.PROMO_FCST_RUR_MON/t2.BASE_FORECAST_GC_M*1000 
+			   as BASE_FCST_UPT /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			case when t2.BASE_FCST_GC is not null and abs(t2.BASE_FCST_GC)>1e-5 
+			   then t1.PROMO_FCST_SALE/t2.BASE_FCST_GC*1000 
 			   else 0
 			   end
-			   as PROMO_FCST_UPT /*– промо прогноз*/,
-			case when t2.BASE_FORECAST_GC_M is not null and abs(t2.BASE_FORECAST_GC_M)>1e-5 
-			   then t1.TOTAL_FCST_QNT_MON/t2.BASE_FORECAST_GC_M*1000 
+			   as PROMO_FCST_UPT /*пїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			case when t2.BASE_FCST_GC is not null and abs(t2.BASE_FCST_GC)>1e-5 
+			   then t1.FINAL_FCST_UNITS/t2.BASE_FCST_GC*1000 
 			   else 0
 			   end
-			   as TOTAL_FCST_UPT /*– суммарный прогноз*/,
-			case when t2.BASE_FORECAST_GC_M is not null and abs(t2.BASE_FORECAST_GC_M)>1e-5 
-			   then t1.TOTAL_FCST_QNT_MON/t2.BASE_FORECAST_GC_M*1000 
+			   as FINAL_FCST_UPT /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ*/,
+			case when t2.BASE_FCST_GC is not null and abs(t2.BASE_FCST_GC)>1e-5 
+			   then t1.FINAL_FCST_UNITS/t2.BASE_FCST_GC*1000 
 			   else 0
 			   end
-			   as OVERRIDED_FCST_UP /*– суммарный прогноз (с учетом логики сохранения оверрайдов)*/,
-			1 as OVERRIDE_TRIGGER_UPT /*– тригер для сохранения оверрайда, по умолчанию равен 1*/
+			   as OVERRIDED_FCST_UPT /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)*/,
+			1 as OVERRIDE_TRIGGER /*пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ 1*/
 			from &lmvOutLibrefPmixLt..&lmvOutTabNamePmixLt. t1 left join &lmvOutLibrefGcLt..&lmvOutTabNameGcLt. t2
 			  on t1.location=t2.location and t1.data=t2.data;
 	quit;
@@ -724,8 +793,10 @@
 			save incaslib="&lmvOutLibrefGcLt." outcaslib="&lmvOutLibrefGcLt." casdata="&lmvOutTabNameGcLt." casout="&lmvOutTabNameGcLt..sashdat" replace;
 			promote casdata="&lmvOutTabNameUptLt." incaslib="&lmvOutLibrefUptLt." outcaslib="&lmvOutLibrefUptLt.";
 			save incaslib="&lmvOutLibrefUptLt." outcaslib="&lmvOutLibrefUptLt." casdata="&lmvOutTabNameUptLt." casout="&lmvOutTabNameUptLt..sashdat" replace;
-			*promote casdata="pmix_daily" incaslib="casuser" outcaslib="mn_long";
-			*save incaslib="mn_long" outcaslib="mn_long" casdata="pmix_daily" casout="pmix_daily.sashdat" replace;
+			/*
+			promote casdata="fc_w_plm" incaslib="casuser" outcaslib="mn_short";
+			save incaslib="mn_short" outcaslib="mn_short" casdata="fc_w_plm" casout="fc_w_plm.sashdat" replace;
+			*/
 		quit;
 	%end;
 %mend rtp_7_out_integration;

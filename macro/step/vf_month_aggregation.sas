@@ -686,6 +686,4 @@
 
 	%end;
 	
-	cas casauto terminate;
-	
 %mend vf_month_aggregation;

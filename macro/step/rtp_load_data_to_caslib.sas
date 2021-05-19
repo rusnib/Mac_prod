@@ -25,7 +25,7 @@
 *  27-08-2020  Борзунов		Заменен источник данных на ETL_IA. Добавлена выгрузка на диск целевых таблиц
 *  24-09-2020  Борзунов		Добавлена промо-разметка из ПТ
 ****************************************************************************/
-%macro rtp_load_data_to_caslib(mpWorkCaslib=casshort);
+%macro rtp_load_data_to_caslib(mpWorkCaslib=mn_short);
 
 	*options mprint nomprintnest nomlogic nomlogicnest nosymbolgen mcompilenote=all mreplace;
 	
@@ -36,15 +36,11 @@
 			lmvWorkCaslib
 			lmvScoreEndDate
 			;
-			
 
-	
 	%let lmvInLib=ETL_IA;
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
-	%let lmvStartDateScore =%sysfunc(intnx(year,&etl_current_dt.,-1,s));
 	%let lmvWorkCaslib = &mpWorkCaslib.;
-	/* %let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-3,s))-91); */
-	%let lmvStartDate = %sysfunc(intnx(month,&etl_current_dt.,-30,b));
+	%let lmvStartDate = &RTP_START_DATE.;
 	%let lmvEndDate = &VF_HIST_END_DT_SAS.;
 	%let lmvScoreEndDate = %sysfunc(intnx(day,&VF_HIST_END_DT_SAS.,91,s));
 	
@@ -56,7 +52,7 @@
 	%tech_clean_lib(mpCaslibNm=&lmvWorkCaslib.);
 	%tech_clean_lib(mpCaslibNm=mn_long);
 							
-	%add_promotool_marks(mpOutCaslib=&lmvWorkCaslib.,
+	%add_promotool_marks2(mpOutCaslib=&lmvWorkCaslib.,
 							mpPtCaslib=pt);
 	
 	/****** 1. Сбор "каркаса" из pmix ******/
@@ -179,13 +175,12 @@
 	
 	proc casutil;
 		promote casdata="product_dictionary_ml" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
-		*promote casdata="product_lvl_all" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		droptable casdata='product' incaslib='casuser' quiet;
 		droptable casdata='product_ATTRIBUTES' incaslib='casuser' quiet;
 	run;
 
-	/* Подготовка таблицы с продажами (на время перезаливки таблицы ETL_IA.PMIX_SALES данные берем напрямую из IA) */
-	data CASUSER.pmix_sales(replace=yes  drop=valid_from_dttm valid_to_dttm);
+	/* Подготовка таблицы с продажами */
+	data CASUSER.pmix_sales(replace=yes  drop=valid_from_dttm valid_to_dttm SALES_QTY_DISCOUNT GROSS_SALES_AMT_DISCOUNT NET_SALES_AMT_DISCOUNT);
 			set &lmvInLib..pmix_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.
 			and sales_dt<=&lmvEndDate. and sales_dt>=&lmvStartDate.));
 	run; 
@@ -291,7 +286,6 @@
 		droptable casdata="lvl2" incaslib="casuser" quiet;
 		droptable casdata="lvl1" incaslib="casuser" quiet;
 		droptable casdata="pbo_lvl_all" incaslib="casuser" quiet;
-		*droptable casdata="product_lvl_all" incaslib="casuser" quiet;
 		droptable casdata="promo_ml" incaslib="casuser" quiet;
 		droptable casdata="promo_transposed" incaslib="casuser" quiet;
 		droptable casdata="promo_x_product_leaf" incaslib="casuser" quiet;
@@ -419,11 +413,12 @@
 		;
 	quit;
 
-	/* Соединяем в единый справочник ПБО */
-	*data casuser.product_lvl_all;
-		*set casuser.lvl5 casuser.lvl4 casuser.lvl3 casuser.lvl2 casuser.lvl1;
-	*run;
-
+	data casuser.promo_mech_transformation;
+		length old_mechanic new_mechanic $50;
+		infile "&RTP_PROMO_MECH_TRANSF_FILE." dsd firstobs=2;                 
+		input old_mechanic $ new_mechanic $;                            
+	run;
+	
 	/* Добавляем к таблице промо ПБО и товары */
 	proc fedsql sessref = casauto;
 		create table casuser.promo_x_pbo_leaf{options replace = true} as 
@@ -456,6 +451,7 @@
 				t1.CHANNEL_CD,
 	 			t1.NP_GIFT_PRICE_AMT, 
 				t1.PROMO_MECHANICS,
+				/*
 				(case
 					when t1.PROMO_MECHANICS = 'BOGO / 1+1' then 'bogo'
 					when t1.PROMO_MECHANICS = 'Discount' then 'discount'
@@ -465,8 +461,9 @@
 					when t1.PROMO_MECHANICS = 'Product Gift' then 'product_gift'
 					when t1.PROMO_MECHANICS = 'Other: Discount for volume' then 'other_promo'
 					when t1.PROMO_MECHANICS = 'NP Promo Support' then 'support'
-					/* TEMP  else 'other_promo' */
 				end) as promo_mechanics_name,
+				*/
+				t4.new_mechanic as promo_mechanics_name,
 				1 as promo_flag		
 			from
 				casuser.promo as t1 
@@ -478,11 +475,15 @@
 				casuser.promo_x_product_leaf as t3
 			on
 				t1.PROMO_ID = t3.PROMO_ID 
+			inner join 
+				casuser.promo_mech_transformation as t4
+			on t1.promo_mechanics = t4.old_mechanic 
 		;
 	quit;
 		
 	proc casutil;
 		droptable casdata="promo_x_product_leaf" incaslib="&lmvWorkCaslib." quiet;
+		promote casdata="promo_mech_transformation" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		promote casdata="product_lvl_all" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		promote casdata="pbo_lvl_all" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		promote casdata="promo_prod" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
@@ -535,7 +536,6 @@
 		droptable casdata="pbo_loc_hierarchy" incaslib="casuser" quiet;
 		droptable casdata="product_hierarchy" incaslib="casuser" quiet;
 		droptable casdata="abt_promo" incaslib="casuser" quiet;
-		droptable casdata="abt5_ml" incaslib="casuser" quiet;
 	run;
 
 	/****** 7. Добавляем мароэкономику ******/
@@ -1147,7 +1147,7 @@
 			,SUCCESSOR_PRODUCT_ID
 			,PREDECESSOR_END_DT
 			,SUCCESSOR_START_DT
-		  from casuser.product_chain
+		  from casuser.product_chain_enh
 		;
 	quit;
 

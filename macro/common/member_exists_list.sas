@@ -9,7 +9,7 @@
 	%put &=lmvCommonExFlg;
 	%if &lmvCommonExFlg ne &lmvParCnt. %then %do;
 		%put WARNING: INPUT PARAMETERS ARE NOT VALID!;
-		OPTIONS NOSYNTAXCHECK OBS=0;
+		OPTIONS SYNTAXCHECK OBS=0;
 		%return;
 	%end;
 %mend member_exists_list;

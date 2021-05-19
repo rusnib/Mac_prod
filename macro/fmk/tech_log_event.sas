@@ -42,7 +42,7 @@
 							NULL,
 							NULL,
 							'',
-							NULL, /*(select max(batch_id) from etl_cfg.cfg_batch_etl_cycle), */
+							NULL,
 							NULL,
 							NULL,
 							%STR(%')&lmvEventType.%STR(%'),
@@ -102,11 +102,13 @@
 				%END;
 				%LET mvSTATUS_DESCRIPTION=%SUBSTR(%STR(&mvERR_TEXT), 1, &mvERR_LEN);
 				%LET mvSTATUS_CD=1;
+				%LET mvTGMessage = Process &lmvProcessNm. has been completed with ERRORS. Description: &mvSTATUS_DESCRIPTION.  ;
 		%END;
 		%ELSE %DO;
 			%LET mvPROCESS_STATUS=Job finished SUCCESSFULLY;
 			%LET mvSTATUS_DESCRIPTION=;
 			%LET mvSTATUS_CD=0;
+			%LET mvTGMessage = Process &lmvProcessNm. has been completed SUCCESSFULLY.;
 		%END;
 	
 		PROC SQL NOPRINT;
@@ -126,6 +128,15 @@
 						event_id=&mvLOG_EVENT_ID.
 				);
 		QUIT;
+		
+		/*Отправка сообщения в телеграмм */
+		filename resp temp ;
+		proc http 
+			 method="POST"
+			  url="https://api.telegram.org/bot1819897875:AAFybj5a677adMYh9AP6O5Av7AN887WsjHY/sendMessage?chat_id=-560181672&text=&mvTGMessage."
+			 ct="application/json"
+			 out=resp; 
+		run;
 	
 		%IF &SYSCC>4 %THEN %DO;
 			

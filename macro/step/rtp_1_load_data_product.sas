@@ -50,10 +50,8 @@
 			
 	%let lmvMode = &mpMode.;
 	%let lmvInLib=ETL_IA;
-	%let etl_current_dt = %sysfunc(today());
-	%let ETL_CURRENT_DTTM = %sysfunc(datetime());
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
-	%let lmvStartDateScore =%sysfunc(intnx(year,&etl_current_dt.,-1,s));
+	%let lmvStartDateScore = &VF_HIST_END_DT_SAS.;
 	%let lmvWorkCaslib = &mpWorkCaslib.;
 	%let lmvEndDate = &VF_HIST_END_DT_SAS.;
 	%let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-3,s))-91);
@@ -301,6 +299,7 @@
 
 
 	/* считаем медиану и среднее арифметическое */
+	options nosymbolgen nomprint nomlogic;
 	proc cas;
 	timeData.runTimeCode result=r /
 		table = {
@@ -447,7 +446,7 @@
 	;
 	run;
 	quit;
-
+	options symbolgen mprint mlogic;
 	/* соеденим среднее, медиану, стд, процентили вместе, убирая пропуску вр ВР */
 	proc fedsql sessref=casauto;
 		create table casuser.abt5_ml{options replace=true} as
@@ -573,6 +572,34 @@
 	  droptable casdata="abt6_ml" incaslib="casuser" quiet;
 	run;
 	
+	/* Генерим макропеременные для вставки в код */
+	data _null_;
+		set &lmvWorkCaslib..promo_mech_transformation end=end;
+		length sql_list sql_max_list $1000;
+		retain sql_list sql_max_list;
+		by new_mechanic;
+
+		if _n_ = 1 then do;
+			sql_list = cats('t1.', new_mechanic);
+			sql_max_list = cat('max(coalesce(t2.', strip(new_mechanic), ', 0)) as ', strip(new_mechanic));
+		end;
+		else if first.new_mechanic then do;
+			sql_list = cats(sql_list, ', t1.', new_mechanic);
+			sql_max_list = cat(strip(sql_max_list), ', max(coalesce(t2.', strip(new_mechanic), ', 0)) as ', strip(new_mechanic));
+		end;
+
+		if end then do;
+			call symputx('promo_list_sql', sql_list, 'G');
+			call symputx('promo_list_sql_max', sql_max_list, 'G');
+		end;
+	run;
+
+	%let promo_list_sql_t2 = %sysfunc(tranwrd(%quote(&promo_list_sql.),%str(t1),%str(t2)));
+
+	%put &promo_list_sql.;
+	%put &promo_list_sql_max.;
+	%put &promo_list_sql_t2.;
+	
 	/* Соединяем с витриной */
 	proc fedsql sessref = casauto;
 		/* Подготоваливаем таблицу для джойна с витриной */
@@ -582,8 +609,7 @@
 				t1.PRODUCT_ID,
 				t1.CHANNEL_CD,
 				t1.SALES_DT,
-				max(coalesce(t2.other_promo, 0)) as other_promo,  
-				/* 0 as other_promo, */
+				/* max(coalesce(t2.other_promo, 0)) as other_promo,  
 				max(coalesce(t2.support, 0)) as support,
 				max(coalesce(t2.bogo, 0)) as bogo,
 				max(coalesce(t2.discount, 0)) as discount,
@@ -591,7 +617,9 @@
 				max(coalesce(t2.non_product_gift, 0)) as non_product_gift,
 				max(coalesce(t2.pairs, 0)) as pairs,
 				max(coalesce(t2.product_gift, 0)) as product_gift,
-				max(coalesce(t3.side_promo_flag, 0)) as side_promo_flag
+				*/
+				max(coalesce(t3.side_promo_flag, 0)) as side_promo_flag,
+				&promo_list_sql_max.
 			from
 				casuser.abt5_ml as t1
 			left join
@@ -648,6 +676,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t2.other_promo,  
 				t2.support,
 				t2.bogo,
@@ -656,6 +685,8 @@
 				t2.non_product_gift,
 				t2.pairs,
 				t2.product_gift,
+				*/
+				&promo_list_sql_t2.,
 				t2.side_promo_flag 
 			from
 				casuser.abt5_ml as t1
@@ -714,6 +745,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -722,6 +754,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t2.A_CPI,
 				t2.A_GPD,
@@ -773,6 +807,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -781,6 +816,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -841,6 +878,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -849,6 +887,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -909,6 +949,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -917,6 +958,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -976,6 +1019,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -984,6 +1028,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -1048,6 +1094,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -1056,6 +1103,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -1132,6 +1181,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -1140,6 +1190,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -1221,6 +1273,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -1229,6 +1282,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -1437,6 +1492,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -1445,6 +1501,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -1550,6 +1608,7 @@
 				t1.lag_week_pct90,	
 				t1.lag_year_pct10,	
 				t1.lag_year_pct90,
+				/*
 				t1.other_promo,  
 				t1.support,
 				t1.bogo,
@@ -1558,6 +1617,8 @@
 				t1.non_product_gift,
 				t1.pairs,
 				t1.product_gift,
+				*/
+				&promo_list_sql.,
 				t1.side_promo_flag,
 				t1.A_CPI,
 				t1.A_GPD,
@@ -1614,13 +1675,15 @@
 		create table casuser.&lmvTabNmOutTrain.{options replace = true} as 
 			select *
 			from casuser.abt16_ml 
-			where sales_dt >= date %str(%')%sysfunc(putn(%sysfunc(intnx(year,&lmvStartDate.,1,b)), yymmdd10.))%str(%')
+			/* Меньше чем intnx(week.2,%sysfunc(date()),0,b) */
+			where sales_dt < date %str(%')%sysfunc(putn(&lmvStartDateScore., yymmdd10.))%str(%')
 			;
 	%end;
 	%if &lmvMode. = A or &lmvMode = S %then %do;
 		create table casuser.&lmvTabNmOutScore.{options replace = true} as 
 			select * 
 			from casuser.abt16_ml 
+			/* Больше чем intnx(week.2,%sysfunc(date()),0,b)  и меньше чем intnx(day,  (intnx(week.2,%sysfunc(date()),0,b))  ,91,s)*/
 			where sales_dt > date %str(%')%sysfunc(putn(&lmvStartDateScore., yymmdd10.))%str(%') and
 				sales_dt <= date %str(%')%sysfunc(putn(&lmvScoreEndDate., yymmdd10.))%str(%')
 		;

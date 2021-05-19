@@ -31,6 +31,8 @@
 						,mpAssignFlg= y
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
+	
+	%tech_log_event(mpMode=START, mpProcess_Nm=vf_restore_sales_gc);	
 						
 	%tech_update_resource_status(mpStatus=P, mpResource=vf_load_data);
 	
@@ -40,10 +42,6 @@
 	
 	%tech_open_resource(mpResource=vf_restore_sales_gc);
 	
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=vf_restore_sales_gc);	
 	
 %mend vf002_restore_sales_gc;

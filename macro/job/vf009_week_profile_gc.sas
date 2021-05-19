@@ -26,6 +26,9 @@
 *  21-07-2020  Борзунов     Начальное кодирование
 ****************************************************************************/
 %macro vf009_week_profile_gc;
+	
+	%tech_log_event(mpMode=START, mpProcess_Nm=vf_train_week_profile_gc);
+
 	%tech_cas_session(mpMode = start
 						,mpCasSessNm = casauto
 						,mpAssignFlg= y
@@ -44,10 +47,6 @@
 	
 	%tech_open_resource(mpResource=vf_month_aggregation);
 	
-	%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=vf_train_week_profile_gc);
 	
 %mend vf009_week_profile_gc;

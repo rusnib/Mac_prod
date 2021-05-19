@@ -19,6 +19,36 @@
 
 	%let mpEnd=&length.;
 	%let mvTHREAD_CNT=&mpThreadCnt.;
+
+	data work.promo_mech_transformation;
+		length old_mechanic new_mechanic $50;
+		infile "&RTP_PROMO_MECH_TRANSF_FILE." dsd firstobs=2;                 
+		input old_mechanic $ new_mechanic $;                            
+	run;	
+
+	proc sort data=work.promo_mech_transformation;
+		by new_mechanic;
+	run;
+
+	data _null_;
+		set work.promo_mech_transformation end=end;
+		length model_list $1000;
+		retain model_list;
+		by new_mechanic;
+	
+		if _n_ = 1 then do;
+			model_list = new_mechanic;
+		end;
+		else if first.new_mechanic then do;
+			model_list = catx('', model_list, new_mechanic);
+		end;
+	
+		if end then do;
+			call symputx('promo_list_model', model_list, 'G');
+		end;
+	run;
+	
+	%put &promo_list_model.;
 	
 	proc casutil;
 		DROPTABLE CASDATA="buffer_table" INCASLIB="casuser" QUIET;
@@ -95,6 +125,8 @@
 			%SYSLPUT mpAbt = &mpAbt. / REMOTE = T_&mvTHREAD_NUM.;
 			%SYSLPUT mpModelTable = &mpModelTable. / REMOTE = T_&mvTHREAD_NUM.;
 			%SYSLPUT mpPrefix = &mpPrefix. / REMOTE = T_&mvTHREAD_NUM.;		
+			%SYSLPUT promo_list_model = &promo_list_model. / REMOTE = T_&mvTHREAD_NUM.;		
+			
 		%END;
 
 	%mend signon;
@@ -102,43 +134,35 @@
 	
 	%macro main_run;
 	
-	/* CALC SCORING WITH THREADS */
-	%DO mvTHREAD_NUM = 1 %TO &mvTHREAD_CNT.;
-		RSUBMIT T_&mvTHREAD_NUM. WAIT=NO CMACVAR=T_&mvTHREAD_NUM.;
-			options notes symbolgen mlogic mprint;
-			/* PROC PRINTTO LOG="/data/logs/log_of_thread_&mvTHREAD_NUM..txt" NEW;
-			RUN; */
-			%tech_redirect_log(mpMode=START, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
-	
-			/* CAS T_&mvTHREAD_NUM. HOST="sasdevinf.ru-central1.internal" PORT=5570; */
-			CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" PORT=5570;
-			caslib _all_ assign;
-			*%include "/opt/sas/mcd_config/config/initialize_global.sas";
-			
-			PROC SQL NOPRINT;
-				SELECT COUNT(*) AS CNT INTO :mvROW_CNT 
-				FROM public.BUFFER_TABLE_&mvTHREAD_NUM.
-				;
-			QUIT;
-
-		/* MAIN CODE FOR EACH THREAD */
-		%MACRO THREAD_MAIN;
+		/* CALC SCORING WITH THREADS */
+		%DO mvTHREAD_NUM = 1 %TO &mvTHREAD_CNT.;
+			RSUBMIT T_&mvTHREAD_NUM. WAIT=NO CMACVAR=T_&mvTHREAD_NUM.;
+				options notes symbolgen mlogic mprint;
+				%tech_redirect_log(mpMode=START, mpJobName=train_thread_&mvTHREAD_NUM., mpArea=Main);
 		
-			%DO ITER = 1 %TO &mvROW_CNT.;
-					/* GET PARAMETERS FROM BUFFER TABLE */
-					DATA WORK.GET_PARAMS_FOR_THREAD_ITER;
-						SET public.BUFFER_TABLE_&mvTHREAD_NUM.(FIRSTOBS = &ITER. OBS = &ITER.);
-						CALL SYMPUTX("i", i);
-					RUN;
-					%PUT &=i;
+				CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" PORT=5570;
+				caslib _all_ assign;
+				
+				PROC SQL NOPRINT;
+					SELECT COUNT(*) AS CNT INTO :mvROW_CNT 
+					FROM public.BUFFER_TABLE_&mvTHREAD_NUM.
+					;
+				QUIT;
 
-					/* %let mvIter = %sysfunc(catx(_, &mvHorNum. , .)); */
-				
-					 /* %macro m_rtp_train(mpTarget=&mpTarget., mpId=&mpId., mpAbt=&mpAbt., mpModelTable=&mpModelTable., mpPrefix=&mpPrefix.); */
-				
+			/* MAIN CODE FOR EACH THREAD */
+			%MACRO THREAD_MAIN;
+			
+				%DO ITER = 1 %TO &mvROW_CNT.;
+						/* GET PARAMETERS FROM BUFFER TABLE */
+						DATA WORK.GET_PARAMS_FOR_THREAD_ITER;
+							SET public.BUFFER_TABLE_&mvTHREAD_NUM.(FIRSTOBS = &ITER. OBS = &ITER.);
+							CALL SYMPUTX("i", i);
+						RUN;
+						%PUT &=i;
+					
 						%local lmvTabNmAbt lmvLibrefAbt;
 						%member_names (mpTable=&mpAbt, mpLibrefNameKey=lmvLibrefAbt, mpMemberNameKey=lmvTabNmAbt);
-	
+
 						data _null_;
 							set models.&mpModelTable.(where=(n=&i.));
 							call symputx('filter', filter);
@@ -149,17 +173,12 @@
 							call symputx('train', train);
 						run;
 						
-						/* TEMP */
-						
-						%let nominal = %sysfunc(tranwrd(&nominal., %str(OTHER_DIGITAL), %str()));
-						%let nominal = %sysfunc(tranwrd(&nominal., %str(OTHER_DISCOUNT), %str()));
-						
-						/* TEMP */
-						
+						%tech_list_concat(mpVarBase=&NOMINAL, mpVarAdd=&promo_list_model, mpOutputVar=full_nominal);			
 						
 						%if &train. %then %do;
 							proc casutil incaslib="Models" outcaslib="Models";
-								droptable casdata="&mpPrefix._&i." quiet;
+								*droptable casdata="&mpPrefix._&i." quiet;
+								droptable casdata="&model." quiet;
 							run;
 							
 							proc forest data=&lmvLibrefAbt..&lmvTabNmAbt.(where=(&filter.))
@@ -168,23 +187,19 @@
 							  target &mpTarget. / level=interval;
 							
 							  input &interval. / level=interval;
-							  input &nominal. / level=nominal;
+							  input &full_nominal. / level=nominal;
 							  grow VARIANCE;
 							  id &mpId.;
 							  savestate rstore=models.&model.;
 							run;
 							proc casutil incaslib="Models" outcaslib="Models";
-								promote casdata="&mpPrefix._&i.";
+								promote casdata="&model.";
 							run;
 						%end;
 
-				/*	%mend m_rtp_train;
-					%m_rtp_train; */
 				%END;
 
-				%tech_redirect_log(mpMode=END, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
-				/* PROC PRINTTO;
-				RUN; */
+				%tech_redirect_log(mpMode=END, mpJobName=train_thread_&mvTHREAD_NUM., mpArea=Main);
 
 			%MEND THREAD_MAIN;
 

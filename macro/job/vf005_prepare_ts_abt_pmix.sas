@@ -32,7 +32,9 @@
 						,mpAssignFlg= y
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
-						
+	
+	%tech_log_event(mpMode=START, mpProcess_Nm=vf_prepare_ts_abt_pmix);
+	
 	%tech_update_resource_status(mpStatus=P, mpResource=vf_run_project_pbo);
 	/* 4. Загрузка таблицы pmix_sal_abt*/
 	%vf_prepare_ts_abt_pmix(mpVfPboProjName=&VF_PBO_PROJ_NM.,
@@ -47,10 +49,6 @@
 	
 	%tech_open_resource(mpResource=vf_prepare_ts_abt_pmix);
 	
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=vf_prepare_ts_abt_pmix);
 	
 %mend vf005_prepare_ts_abt_pmix;

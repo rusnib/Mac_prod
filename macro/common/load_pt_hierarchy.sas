@@ -102,14 +102,16 @@
 		%put "NOTE: The differences between existing table and new batch have founded, Hierarchy table will be replaced." ;
 		/* replace table */
 		PROC SQL NOPRINT;	
-			CONNECT TO POSTGRES AS CONN (server="10.252.151.3" port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192");
-				/* truncate target table in PT PG schema */
+		/*
+		CONNECT TO POSTGRES AS CONN (server="10.252.151.3" port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192");
+		*/
+		connect using pt;
+		/* truncate target table in PT PG schema */
 				EXECUTE BY CONN
 					(
 						TRUNCATE TABLE public.&lmvTabNmIn.
 					)
 				;
-				DISCONNECT FROM CONN;
 		QUIT;
 
 		data work.&lmvTabNmIn._NEW(drop = hash_key_id hash_value_id);

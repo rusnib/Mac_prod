@@ -17,42 +17,19 @@
 %global ETL_FILE_INPUT_ROOT;        /* Путь к входным файлам (корневой каталог) */
 %global ETL_FILE_OUTPUT_ROOT;       /* Путь к выходным файлам (корневой каталог) */
 
-%global ETL_PRECISION;              /* Допустимое расхождение, при котором признается равенство величин */
-%global ETL_TYPE;                   /* Тип идущей загрузки:  INIT - инициализация, FULL - полная, и INC - инкрементальная */
-%global ETL_DEBUG;                  /* Признак отладочного запуска */
-
-%global ETL_DWH_INIT_DT;            /* Дата начала истории хранилища */
-%global ETL_CURRENT_JOB_ID;         /* ID текущего процесса ETL */
-%global ETL_MODULE_RC;              /* Код ошибки в текущем процессе ETL */
-
-%global ETL_TIME_FRAME_TYPE;        /* Тип окна загрузки:  FIXED (от фикс. даты) или FLOATING (скользящий) */
-%global ETL_TIME_FRAME_VALUE;       /* Для FIXED - дата в формате числа, для FLOATING - глубина интервала в днях */
-%global ETL_TIME_FRAME_DT;          /* Вычисляемая дата начала интервала загрузки */
-%global ETL_TIME_FRAME_DTTM;        /* Вычисляемая дата-время начала интервала загрузки */
-
-%global ETL_MIN_DT;                 /* Минимальная дата в системе, -бесконечность */
-%global ETL_MAX_DT;                 /* Максимальная дата в системе, +бесконечность */
-%global ETL_MIN_DTTM;               /* Минимальная дата-время в системе, -бесконечность */
-%global ETL_MAX_DTTM;               /* Максимальная дата-время в системе, +бесконечность */
-%global ETL_SCD_NEW_DTTM;           /* Дата, которой открываются первые версии записей SCD */
+%global ETL_SCD_FUTURE_DT;			/* Дата, которой закрываются текущие версии записей SCD в днях */
+%global ETL_SCD_PAST_DT;			/* Дата начала для версий, корректируемых вручную 1 января 1960 года */
 %global ETL_SCD_FUTURE_DTTM;        /* Дата, которой закрываются текущие версии записей SCD */
 %global ETL_SCD_FUTURE_DTTM_DB;		/* Дата, которой закрываются текущие версии записей SCD в формате DB*/
 %global ETL_CURRENT_DT;             /* Текущая дата для ETL-процессов */
 %global ETL_CURRENT_DTTM;           /* Текущее дата-время для ETL-процессов */
 %global ETL_CURRENT_DTTM_DB;		/* Текущее дата-время для ETL-процессов в формате DB*/
-%global ETL_DEFAULT_COUNTRY;        /* Страна по умолчанию (Россия) */
-%global ETL_DEFAULT_CURRENCY;       /* Валюта по умолчанию (рубли) */
-%global ETL_DEFAULT_LANGUAGE;       /* Язык по умолчанию (русский) */
 
 %global DEPTH_STORED_VERSIONS;		/* Глубина хранения версия в директориях etl_stg etl_ia */
 %global IORC_SOK;                   /* Константа - номер ошибки _SOK */
 %global IORC_DSENOM;                /* Константа - номер ошибки _DSENOM */
 %global IORC_DSENMR;                /* Константа - номер ошибки _DSENMR */
 
-%global ETL_D0_ID;                  /* Бизнес-ключ для дамми-записи D0 */
-%global ETL_D0_RK;                  /* Суррогатный ключ для дамми-записи D0 */
-%global ETL_D0_CD;                  /* Внешний ключ для дамми-символьной ссылки D0 */
-%global ETL_BK_INVALID;             /* Обозначение неверного значения в бизнес-ключе */
 
 %global ETL_SYS_CONNECT_OPTIONS;    /* Параметры подключения к системной схеме ETL_SYS */
 %global ETL_IA_CONNECT_OPTIONS;     /* Параметры подключения к системной схеме ETL_IA */
@@ -64,12 +41,13 @@
 
 %global ETL_PG_BULKLOAD;			/* Опции BULKLOAD (только для работы со схемами Postgresql) */
 %global ETL_BULKLOAD_OPTIONS;       /* Опции BULKLOAD (только для работы со схемами ETL) */
-%global ETL_FIX_ORPHANED_EVENTS;    /* Признак учета событий, не отнесенных ни к какому процессу */
+%global ETL_RESTART_FAILED_PROCESSES;     /* Флаг для перезапуска упавших процессов выгрузки */
 
 %global SYS_OS_FAMILY;              /* Семейство текущей ОС (WIN, UNIX) */
 
 %global CUR_API_URL;				/* Текущий API URL */
-
+%global RTP_START_DATE;				/* Начальная дата для отбора данных в рамках процесса расчета краткосрочного прогноза */
+%global VF_START_DATE;				/* Начальная дата для отбора данных в рамках процесса расчета долгосрочного прогноза */
 %global VF_FC_HORIZ;				/* Число интервалов для прогнозирования */
 %global VF_FC_START_DT;				/* Дата начала прогноза (должна быть понедельником)*/
 %global VF_FC_START_DT_SAS;			/* Дата начала прогноза (должна быть понедельником) в формате yymmdd10. */
@@ -86,12 +64,17 @@
 %global VF_PMIX_PROJ_NM;			/* ID VF-проекта, построенного на pmix_sal_abt*/
 %global VF_PBO_ID;					/* Наименование VF-проекта, построенного на pbo_sal_abt*/
 %global VF_PBO_PROJ_NM;				/* Наименование VF-проекта, построенного на pbo_sal_abt*/
+%global VF_GC_NM;					/* Наименование VF-проекта для прогнозирования GC*/
+%global VF_PBO_NM;					/* Наименование VF-проекта для прогнозирования PBO*/
+
+
 %global RTP_TRAIN_FLG_PMIX;			/* Флаг запуска обучения моделей PMIX (Y/N)*/
 %global RTP_TRAIN_FLG_MC;			/* Флаг запуска обучения моделей MC (Y/N)*/
+%global RTP_PROMO_MECH_TRANSF_FILE; /* Путь до csv-файла управляющей промо-таблицы */
 %global SAS_START_CMD;              /* Путь к start_sas */
 
 /*===================================== GLOBAL ===================================*/
-/* Здесь назначаются глобальные переменные, общие для всех фаз                    */
+/* Здесь назначаются глобальные переменные						                  */
 /*================================================================================*/
 
 %let ETL_DBMS                       =  postgres;
@@ -103,46 +86,19 @@
 %let ETL_FILE_INPUT_ROOT            =  &ETL_DATA_ROOT./files/input;
 %let ETL_FILE_OUTPUT_ROOT           =  &ETL_DATA_ROOT./files/output;
 
-%let ETL_DBCS                       =  %eval(%sysfunc(getoption(DBCS)) eq DBCS);
-%let ETL_PRECISION                  =  1e-10;
-%let ETL_TYPE                       =  INC;
-%let ETL_DEBUG                      =  1;
-
-%let ETL_DWH_INIT_DT                =  %sysfunc(putn('01Jan2020'd, 8.));
-%let ETL_CURRENT_JOB_ID             =  ;
-%let ETL_MODULE_RC                  =  0;
-
-%let ETL_TIME_FRAME_TYPE            =  FLOATING;
-%let ETL_TIME_FRAME_VALUE           =  40;
-
-%let ETL_MIN_DT                     =  %sysfunc(putn('01Jan2000'd, best.));
-%let ETL_MAX_DT                     =  %sysfunc(putn('01Jan2100'd, best.));
-%let ETL_MIN_DTTM                   =  %sysfunc(dhms(&ETL_MIN_DT, 0, 0, 0));
-%let ETL_MAX_DTTM                   =  %sysfunc(dhms(&ETL_MAX_DT, 0, 0, 0));
-%let ETL_SCD_NEW_DTTM               =  %sysfunc(dhms(&ETL_MIN_DT, 0, 0, 0));
+%let ETL_SCD_PAST_DT				=  %sysfunc(putn( '01JAN1960'd, best.));
+%let ETL_SCD_FUTURE_DT            	=  %sysfunc(putn('01Jan5999'd, best.));
 %let ETL_SCD_FUTURE_DTTM            =  %sysfunc(putn('01Jan5999 00:00:00'dt, best.));
 %let ETL_SCD_FUTURE_DTTM_DB			=  %str(date%')01Jan5999 00:00:00%str(%');
 %let ETL_CURRENT_DT                 =  %sysfunc(date());
-%let ETL_CURRENT_DTTM               = /*%sysfunc(dhms(&ETL_CURRENT_DT,0,0,0)); */ %sysfunc(datetime());
+%let ETL_CURRENT_DTTM               =  %sysfunc(datetime());
 %let ETL_CURRENT_DTTM_DB			=  %str(%')%sysfunc(putn(%sysfunc(datepart(%sysfunc(datetime()))),yymmdd10.))%str( )%sysfunc(putn(%sysfunc(timepart(%sysfunc(datetime()))), time.))%str(%');
 
-%let ETL_DEFAULT_COUNTRY            =  "RUS";
-%let ETL_DEFAULT_CURRENCY           =  "RUR";
-%let ETL_DEFAULT_LANGUAGE           =  "RUS";
-
 %let DEPTH_STORED_VERSIONS			=  5;
-%let IORC_SOK                       =  %sysrc(_SOK);
-%let IORC_DSENOM                    =  %sysrc(_DSENOM);
-%let IORC_DSENMR                    =  %sysrc(_DSENMR);
-
-%let ETL_BK_INVALID                 =  F;
-%let ETL_D0_ID                      =  "%sysfunc(repeat(&ETL_BK_INVALID, 2))";
-%let ETL_D0_RK                      =  0;
-%let ETL_D0_CD                      =  "DUM";
 
 %let ETL_PG_BULKLOAD				=  bulkload=yes bl_default_dir="/data/pg_blk/" bl_psql_path="/usr/pgsql-11/bin/psql" BL_FORMAT=CSV BL_ESCAPE=ON BL_DELETE_DATAFILE=YES;
 %let ETL_BULKLOAD_OPTIONS           =  BULKLOAD=NO BL_DEFAULT_DIR="&ETL_DATA_ROOT./sqlldr/" BL_DELETE_DATAFILE=YES;
-%let ETL_FIX_ORPHANED_EVENTS        =  0;
+%let ETL_RESTART_FAILED_PROCESSES   =  YES;
 
 %let CUR_API_URL					=  10.252.151.9;
 
@@ -163,10 +119,15 @@
 %let VF_PBO_ID 						= 50a3762d-58b0-4848-9125-cf3e9df0891d;
 %let VF_PMIX_PROJ_NM				= nm_abt_pmix;
 %let VF_PBO_PROJ_NM					= nm_abt_pbo;
+%let VF_GC_NM						= mn_gc_shortterm;
+%let VF_PBO_NM						= mn_pbo_shortterm;
+
 %let RTP_TRAIN_FLG_PMIX				= N;
 %let RTP_TRAIN_FLG_MC				= N;
+%let RTP_PROMO_MECH_TRANSF_FILE		= /data/files/input/PROMO_MECH_TRANSFORMATION.csv;
 %let SAS_START_CMD                  =  &ETL_ROOT/config/start_sas.cmd;
-
+%let VF_START_DATE					= %sysfunc(intnx(month,&VF_HIST_START_DT_SAS.,10,b));
+%let RTP_START_DATE					= %eval(%sysfunc(intnx(year,&etl_current_dt.,-2,s))-91); 
 /*===================================== GLOBAL ===================================*/
 /* Здесь исполняются глобальные назначения                                        */
 /*================================================================================*/
@@ -195,11 +156,7 @@ options
    fullstimer
    msglevel    = 'I'
    missing     = '.'
-   nosortequals
    varinitchk     =  NOTE
-  /* dsoptions      =  "note2err" */
-   /*sastrace=',,,d'
-   sastraceloc=saslog*/
 ;
 
 /* Настройка логирования */
@@ -227,59 +184,10 @@ libname etl_stg postgres &ETL_STG_CONNECT_OPTIONS schema=etl_stg;
 
 libname etl_cfg postgres &ETL_CFG_CONNECT_OPTIONS schema=etl_cfg;
 
-libname pt postgres server="&CUR_API_URL." port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192";
+libname pt postgres server="10.252.151.3" port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192"; 
 
-LIBNAME ia ORACLE &IA_CONNECT_OPTIONS SCHEMA=sas_interf;
+libname pt_prod postgres server="&CUR_API_URL." port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192";
+
+LIBNAME ia ORACLE &IA_CONNECT_OPTIONS SCHEMA=&IA_CONNECT_SCHEMA.;
 
 libname ETL_TMP "/data/ETL_TMP";
-
-/*==================================== COMPUTED  =================================*/
-/* Вычисляемые настройки                                                          */
-/*================================================================================*/
-%macro init_computed;
-
-   /* ETL_TIME_FRAME_DT - Вычисляемая дата начала интервала загрузки */
-   %let ETL_TIME_FRAME_DT = &ETL_MIN_DT;
-   %if &ETL_TYPE eq INC %then %do;
-      %if &ETL_TIME_FRAME_TYPE eq FIXED %then %do;
-         %let ETL_TIME_FRAME_DT = &ETL_TIME_FRAME_VALUE;
-      %end;
-      %else %if &ETL_TIME_FRAME_TYPE eq FLOATING %then %do;
-         %let ETL_TIME_FRAME_DT = %eval(%sysfunc(today()) - &ETL_TIME_FRAME_VALUE);
-      %end;
-   %end;
-
-   %let ETL_TIME_FRAME_DTTM = %sysfunc(dhms(&ETL_TIME_FRAME_DT, 0, 0, 0));
-
-   /* Внешнее указание режима загрузки */
-   %if %sysfunc(envlen(ETL_TYPE)) ne -1 %then
-      %let ETL_TYPE = %sysget(ETL_TYPE);
-
-   /* SYS_OS_FAMILY - Семейство текущей ОС */
-   %if &SYSSCP = WIN %then %do;
-      %let SYS_OS_FAMILY = WIN;
-   %end;
-   %else %if "&SYSSCPL" = "HP-UX" or %upcase(&SYSSCPL) = LINUX or &SYSSCPL = AIX or %upcase(&SYSSCPL) = SUNOS %then %do;
-      %let SYS_OS_FAMILY = UNIX;
-   %end;
-   %else %do;
-      %let SYS_OS_FAMILY = ;
-      %log4sas_fatal (cwf.config.initialize_global, OS &SYSSCP is not supported);
-   %end;
-
-   /* Настройка логирования */
-   %if &ETL_DEBUG %then %do;
-      %log4sas_logger(cwf, "additivity=true level=DEBUG");
-      %log4sas_logger(dwf, "additivity=true level=DEBUG");
-   %end;
-
-   /* Переопределение переменных из окружения */
-   %macro sm_override_var;
-      %if %sysfunc(sysexist(&name)) %then %do;
-         %let &name = %sysget(&name);
-         %log4sas_info (cwf.config.initialize_global, Value of &name overridden to %nrbquote(&&&name));
-   %end;
-   %mend sm_override_var;
-   %util_loop_data (mpData=sashelp.vmacro, mpLoopMacro=sm_override_var, mpWhere= scope="GLOBAL");
-%mend init_computed;
-%init_computed;

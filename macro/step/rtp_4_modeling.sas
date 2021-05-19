@@ -197,13 +197,13 @@
 							mpModTable=&modeltable.);
 	%end;
 	%else %do;
-		%m_rtp_create_model_table(cts=&categories.,
-							abt=&traintable.,
-							modtable=&modeltable., 
-							params=&default_params.,
-							interval=&default_interval.,
-							nominal=&default_nominal.,
-							prefix=&model_prefix.);
+		%m_rtp_create_model_table(mpCts=&categories.,
+								mpAbt=&traintable.,
+								mpModelTable=&modeltable., 
+								mpParams=&default_params., 
+								mpInterval=&default_interval., 
+								mpNominal=&default_nominal., 
+								mpPrefix=&model_prefix.);
 	%end;
 
 	data _null_;
@@ -213,7 +213,7 @@
 	run;
 	
 	%if &lmvMode. = TRAIN or &lmvMode. = FULL %then %do;
-		%rtp_train_multi(mpThreadCnt=10,
+		%rtp_train_multi(mpThreadCnt=20,
 							mpModelTable=&modeltable.,
 							mpId = &ids.,
 							mpTarget =&target.,
@@ -222,7 +222,7 @@
 							mpStart = 1);
 	%end;
 	%if &lmvMode. = SCORE or &lmvMode. = FULL %then %do;
-		%rtp_score_multi(mpThreadCnt=10,
+		%rtp_score_multi(mpThreadCnt=20,
 						mpModelTable=&modeltable.,
 						mpId = &ids.,
 						mpTarget =&target.,

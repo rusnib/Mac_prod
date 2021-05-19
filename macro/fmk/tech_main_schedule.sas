@@ -1,5 +1,6 @@
 %macro tech_main_schedule;
 	/* 0. Этап проверки интеграционого слоя на доступность новых ресурсов к загрузке в систему SAS */
+	options nomprint nomlogic nosymbolgen;
 	proc sql noprint;
 		create table work.ia_resources as
 			select resource_name
@@ -28,6 +29,15 @@
 				)
 		;
 	quit;
+	
+	/* Перезапуск упавших ресурсов */
+	%if &ETL_RESTART_FAILED_PROCESSES.=YES %then %do;
+		proc sql;
+			update etl_cfg.cfg_status_table
+			set status_cd = 'A'
+			where status_cd ='E' ;
+		quit;
+	%end;
 
 	/* Открываем ресурсы */
 	%if %member_obs(mpData=work.ready_to_downl_res_checked) gt 0 %then %do;
@@ -175,20 +185,12 @@
 		  COALESCE(t2.resource_id ,1) = 1
 	   ;
 	quit;
-	/*
-	data resources_to_start;
-		set resources_to_start;
-		macro_nm=scan(macro_nm, -1, "/");
-	run;
-	*/
 	
 	data resources_to_start;
 		set resources_to_start;
 		macro_nm=scan(macro_nm, -1, "/"); /*получаем только имена скриптов*/
 		resource_nm = tranwrd(tranwrd(lowcase(resource_nm), 'ia_', ''),'stg_', '');
 	run;
-		*%let etls_jobName=tech_main_schedule;
-		*%etl_job_start;
 
 		data open_res;
 			set resources_to_start;
@@ -203,12 +205,6 @@
 			%let resource_nm = %trim(&resource_nm.);
 			
 			filename par_&seq temp;
-			/*
-			data _null_;
-				file par_&seq;                   
-				put "%nrstr(%%)&macro_nm.";
-			run;
-			*/
 			
 			data _null_;
 				file par_&seq;       
@@ -240,7 +236,9 @@
 			%if &SYSRC ne 0 %then %do;
 				%put WARNING: сессия не была запущена успешно;
 			%end;
-
+			%else %do;
+				%put NOTE: Процесс &macro_nm. запущен;
+			%end;
 		%mend m_schedule_check;
 
 
@@ -257,5 +255,4 @@
 			 mpLoopMacro       =  m_schedule_check_waitfor,
 			 mpData            =  open_res);
 			
-		*%etl_job_finish;
 %mend tech_main_schedule;

@@ -75,7 +75,7 @@
 		tEnd= "&vf_fc_agg_end_dt" 
 		table={caslib="mn_long",name="pbo_sales_rest", groupby={"PBO_LOCATION_ID","CHANNEL_CD"} ,
 	       where="sales_dt>=&vf_hist_start_dt_sas"}
-		timeId="SALES_DT"
+		timeId={name="SALES_DT", format="DATE9."}
 		interval="week.2"
 		trimId="LEFT"
 		casOut={caslib="casuser",name="&lmvOutTabNameTsPboSales",replace=True}
@@ -417,7 +417,7 @@
 	   save incaslib="mn_long" outcaslib="mn_long" casdata="&lmvOutTabNamePboSalAbt._dlv" casout="&lmvOutTabNamePboSalAbt._dlv.sashdat" replace;
 	run;
 	
-	
+	/*
 	proc casutil;  
 		droptable casdata="&lmvOutTabNamePboSalAbt._dlv" incaslib="max_casl" quiet;
 		droptable casdata="&lmvOutTabNamePromoW1." incaslib="max_casl" quiet;
@@ -437,7 +437,7 @@
 	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePromoW1." casout="&lmvOutTabNamePromoW1..sashdat" replace;
 	 save incaslib="max_casl" outcaslib="max_casl" casdata="&lmvOutTabNamePromoD." casout="&lmvOutTabNamePromoD..sashdat" replace;
 	run;
-	
+	*/
 	
 	proc casutil;  
 		promote casdata="&lmvOutTabNamePboSalAbt." incaslib="casuser" outcaslib="&lmvOutLibrefPboSalAbt.";

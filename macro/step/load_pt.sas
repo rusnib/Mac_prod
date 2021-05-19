@@ -28,13 +28,13 @@
 *  25-08-2020  Борзунов     Начальное кодирование
 ****************************************************************************/
 %macro load_pt;
-	%M_ETL_REDIRECT_LOG(START, load_pt, Main);
-	%M_LOG_EVENT(START, load_pt);
 	/* bkp pt dir */
 	%bkp_pt;
 	
-	%let ETL_CURRENT_DT = %sysfunc(today());
-	%let ETL_CURRENT_DTTM=%sysfunc(datetime());
+	%local mvDatetime 
+			lmvReportDttm
+	;
+	
 	%let mvDatetime=&ETL_CURRENT_DT.;
 	%let lmvReportDttm = &ETL_CURRENT_DTTM.;
 
@@ -249,7 +249,7 @@
 	/*calc new member_rk for batch*/
 	data work.channel_new(drop=flag);
 		set work.channel_gen(where=(flag=1));
-		member_rk = _n_ + &lmvMaxMemberRk.; /* генерирует РК на основе существующего максимального значения RK */
+		member_rk = _n_ + coalesce(&lmvMaxMemberRk.,0); /* генерирует РК на основе существующего максимального значения RK */
 	run;
 	
 	/* append batch + old */
@@ -803,6 +803,4 @@
 		;
 	quit;
 	/* END PROMO */
-	%M_LOG_EVENT(END, load_pt);
-	%M_ETL_REDIRECT_LOG(END, load_pt, Main);
 %mend load_pt;

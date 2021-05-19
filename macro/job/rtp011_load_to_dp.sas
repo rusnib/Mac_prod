@@ -35,6 +35,7 @@
 	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_load_to_dp);				
 	%tech_update_resource_status(mpStatus=P, mpResource=rtp_komp_sep);
 	
+	/*
 		%dp_jobexecution(mpJobName=ACT_LOAD_QNT_FoM_KOMP);
 
 		%dp_jobexecution(mpJobName=ACT_LOAD_GC_FoM_KOMP);
@@ -53,7 +54,7 @@
 
 		%dp_jobexecution(mpJobName=ACT_LOAD_UPT_FoM_NONKOMP);
 		%dp_jobexecution(mpJobName=ACT_LOAD_UPT_FoD_NONKOMP);
-		
+	*/	
 		%macro load_csv_to_dp(mpJobName=ACT_LOAD_QNT_FoD_KOMP);
 			filename resp TEMP;
 			%let lmvJobName=&mpJobName.;
@@ -152,9 +153,9 @@
 			%end;
 			
 		%mend load_csv_to_dp;
-		%load_csv_to_dp(mpJobName=ACT_LOAD_QNT_FoD_KOMP);
+		*%load_csv_to_dp(mpJobName=ACT_LOAD_QNT_FoD_KOMP);
 		
-		/* start seeding */
+		/* start seeding 
 		%dp_jobexecution(mpJobName=ACT_SEED_COMP_SALE_MONTH);
 		%dp_jobexecution(mpJobName=ACT_SEED_COMP_SALE_DAY);
 		%dp_jobexecution(mpJobName=ACT_SEED_COMP_GC_MONTH);
@@ -168,7 +169,7 @@
 		%dp_jobexecution(mpJobName=ACT_GC_SEED_DAY_NONKOMP);
 		%dp_jobexecution(mpJobName=ACT_UPT_SEED_MON_NONKOMP);
 		%dp_jobexecution(mpJobName=ACT_UPT_SEED_DAY_NONKOMP);
-
+	*/
 	%tech_update_resource_status(mpStatus=L, mpResource=rtp_komp_sep);
 	%tech_open_resource(mpResource=rtp_load_to_dp);
 	

@@ -27,6 +27,8 @@
 ****************************************************************************/
 %macro vf008_train_week_profile;
 
+	%tech_log_event(mpMode=START, mpProcess_Nm=vf_train_week_profile);
+
 	%tech_cas_session(mpMode = start
 						,mpCasSessNm = casauto
 						,mpAssignFlg= y
@@ -42,10 +44,6 @@
 	
 	%tech_open_resource(mpResource=vf_train_week_profile);
 	
-	%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=vf_train_week_profile);
 	
 %mend vf008_train_week_profile;

@@ -135,7 +135,7 @@
 	quit;
 	*%dp_export_csv_prod(mpInput=&lmvOutLibrefGcLt..&lmvOutTabNameGcLt._nonkomp
 					, mpPath=&lmvPathOut.);
-	%dp_export_csv(mpInput=&lmvOutLibrefGcLt..&lmvOutTabNameGcLt._nonkomp, mpTHREAD_CNT=30, mpPath=&lmvPathOut.);
+	%dp_export_csv(mpInput=&lmvOutLibrefGcLt..&lmvOutTabNameGcLt._nonkomp, mpTHREAD_CNT=2, mpPath=&lmvPathOut.);
 	proc casutil;
 		droptable casdata="&lmvOutTabNameGcLt._nonkomp" incaslib="&lmvOutLibrefGcLt." quiet;
 	quit;
@@ -209,7 +209,7 @@
 	quit;
 	*%dp_export_csv_prod(mpInput=&lmvOutLibrefGcSt..&lmvOutTabNameGcSt._nonkomp
 					, mpPath=&lmvPathOut.);
-	%dp_export_csv(mpInput=&lmvOutLibrefGcSt..&lmvOutTabNameGcSt._nonkomp, mpTHREAD_CNT=30, mpPath=&lmvPathOut.);
+	%dp_export_csv(mpInput=&lmvOutLibrefGcSt..&lmvOutTabNameGcSt._nonkomp, mpTHREAD_CNT=3, mpPath=&lmvPathOut.);
 	proc casutil;
 		droptable casdata="&lmvOutTabNameGcSt._nonkomp" incaslib="&lmvOutLibrefGcSt." quiet;
 	quit;	
@@ -239,7 +239,7 @@
 	quit;
 	*%dp_export_csv_prod(mpInput=&lmvOutLibrefUptLt..&lmvOutTabNameUptLt._komp
 					, mpPath=&lmvPathOut.);
-	%dp_export_csv(mpInput=&lmvOutLibrefUptLt..&lmvOutTabNameUptLt., mpTHREAD_CNT=30, mpPath=&lmvPathOut.);
+	%dp_export_csv(mpInput=&lmvOutLibrefUptLt..&lmvOutTabNameUptLt._komp, mpTHREAD_CNT=30, mpPath=&lmvPathOut.);
 	proc casutil;
 		droptable casdata="&lmvOutTabNameUptLt._komp" incaslib="&lmvOutLibrefUptLt." quiet;
 	quit;
@@ -294,7 +294,7 @@
 	quit;
 	*%dp_export_csv_prod(mpInput=&lmvOutLibrefGcLt..&lmvOutTabNameGcLt._komp
 					, mpPath=&lmvPathOut.);
-	%dp_export_csv(mpInput=&lmvOutLibrefGcLt..&lmvOutTabNameGcLt._komp, mpTHREAD_CNT=30, mpPath=&lmvPathOut.);
+	%dp_export_csv(mpInput=&lmvOutLibrefGcLt..&lmvOutTabNameGcLt._komp, mpTHREAD_CNT=3, mpPath=&lmvPathOut.);
 	proc casutil;
 		droptable casdata="&lmvOutTabNameGcLt._komp" incaslib="&lmvOutLibrefGcLt." quiet;
 	quit;
@@ -522,7 +522,7 @@
 	quit;
 	*%dp_export_csv_prod(mpInput=&lmvOutLibrefGcSt..&lmvOutTabNameGcSt._komp
 					, mpPath=&lmvPathOut.);
-	%dp_export_csv(mpInput=&lmvOutLibrefGcSt..&lmvOutTabNameGcSt._komp, mpTHREAD_CNT=30, mpPath=&lmvPathOut.);				
+	%dp_export_csv(mpInput=&lmvOutLibrefGcSt..&lmvOutTabNameGcSt._komp, mpTHREAD_CNT=5, mpPath=&lmvPathOut.);				
 	proc casutil;
 		droptable casdata="&lmvOutTabNameGcSt._komp" incaslib="&lmvOutLibrefGcSt." quiet;
 	quit;

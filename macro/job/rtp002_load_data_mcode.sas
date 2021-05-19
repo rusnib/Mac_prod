@@ -30,7 +30,7 @@
 						,mpAssignFlg= y
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
-						
+	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_load_data_mcode);						
 	%tech_update_resource_status(mpStatus=P, mpResource=rtp_abt_pmix);
 	
 	%rtp_2_load_data_mastercode( mpMode=A,
@@ -43,11 +43,6 @@
 	
 	%tech_update_resource_status(mpStatus=L, mpResource=rtp_abt_pmix);
 	%tech_open_resource(mpResource=rtp_abt_mc);
-	
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_load_data_mcode);	
 	
 %mend rtp002_load_data_mcode;

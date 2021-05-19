@@ -30,7 +30,7 @@
 						,mpAssignFlg= y
 						,mpAuthinfoUsr=&SYSUSERID.
 						);
-						
+	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_load_data_pbo);					
 	%tech_update_resource_status(mpStatus=P, mpResource=rtp_abt_pbo_prepare);
 	/* 1. загрузка данных в CAS */
 	%rtp_3_load_data_pbo(mpMode=A, 
@@ -38,11 +38,6 @@
 							mpOutTableScore=mn_short.pbo_score); 
 	%tech_update_resource_status(mpStatus=L, mpResource=rtp_abt_pbo_prepare);
 	%tech_open_resource(mpResource=rtp_abt_pbo);
-	
-	*%tech_cas_session(mpMode = end
-						,mpCasSessNm = casauto
-						,mpAssignFlg= y
-						,mpAuthinfoUsr=&SYSUSERID.
-						);
+	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_load_data_pbo);
 	
 %mend rtp003_load_data_pbo;
