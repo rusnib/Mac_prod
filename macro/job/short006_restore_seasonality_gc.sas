@@ -36,7 +36,7 @@
 						);
 						
 	%tech_update_resource_status(mpStatus=P, mpResource=short_restore_seasonality_pbo);
-	%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+	%tech_get_token(mpUsername=&SYS_ADM_USER., mpOutToken=tmp_token);
 	%fcst_restore_seasonality(mpInputTbl= MN_DICT.TRAIN_ABT_TRP_GC
 							 ,mpMode=GC
 							 ,mpOutTableNm = mn_dict.gc_forecast_restored

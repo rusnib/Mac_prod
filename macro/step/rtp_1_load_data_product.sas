@@ -54,7 +54,7 @@
 	%let lmvStartDateScore = &VF_HIST_END_DT_SAS.;
 	%let lmvWorkCaslib = &mpWorkCaslib.;
 	%let lmvEndDate = &VF_HIST_END_DT_SAS.;
-	%let lmvStartDate = %eval(%sysfunc(intnx(year,&etl_current_dt.,-3,s))-91);
+	%let lmvStartDate = %sysfunc(intnx(year,&etl_current_dt.,-3,s));
 	%let lmvScoreEndDate = %sysfunc(intnx(day,&VF_HIST_END_DT_SAS.,91,s));
 	
 	%member_names (mpTable=&mpOutTrain, mpLibrefNameKey=lmvLibrefOutTrain, mpMemberNameKey=lmvTabNmOutTrain);
@@ -98,6 +98,7 @@
 				t1.product_id = t2.product_id
 				and t1.SALES_DT >= %str(date%')%sysfunc(putn(&lmvStartDate.,yymmdd10.))%str(%') and
 				t1.SALES_DT <= %str(date%')%sysfunc(putn(&lmvScoreEndDate.,yymmdd10.))%str(%')
+			where t1.CHANNEL_CD = 'ALL'
 		;
 	quit;
 
@@ -255,7 +256,7 @@
 			from 
 				casuser.abt4_ml as t1
 			where 		
-			(t1.sum_qty is not missing and t1.SALES_DT <= %str(date%')%sysfunc(putn(&lmvScoreEndDate.,yymmdd10.))%str(%')) or
+			(t1.sum_qty is not missing and t1.SALES_DT <= %str(date%')%sysfunc(putn(&lmvEndDate.,yymmdd10.))%str(%')) or
 			(t1.SALES_DT > %str(date%')%sysfunc(putn(&lmvEndDate.,yymmdd10.))%str(%'))
 		;
 	quit;
@@ -280,7 +281,7 @@
 				t1.SALES_DT <= t2.end_dt and 
 				t1.SALES_DT >= t2.start_dt
 			where	
-			(t1.SALES_DT <= %str(date%')%sysfunc(putn(&lmvScoreEndDate.,yymmdd10.))%str(%')) or 
+			(t1.SALES_DT <= %str(date%')%sysfunc(putn(&lmvEndDate.,yymmdd10.))%str(%')) or 
 			(t2.PBO_LOCATION_ID is not missing)
 		;
 	quit;
@@ -318,7 +319,7 @@
 		code=
 			%unquote(%str(%"))
 			%let names=; /*будущий список выходных переменных для proc cas */
-			%let minlag=91; /*параметр MinLag*/
+			%let minlag=35; /*параметр MinLag*/
 			/*-=-=-=-=-= min_lag + окна -=-=-=-=-=-*/
 			%let window_list = 7 30 90 180 365;
 			%let lag=&minlag;
@@ -368,7 +369,7 @@
 		code=
 			%unquote(%str(%"))
 			%let names=; /*будущий список выходных переменных для proc cas */
-			%let minlag=91; /*параметр MinLag*/
+			%let minlag=35; /*параметр MinLag*/
 			/*-=-=-=-=-= min_lag + окна -=-=-=-=-=-*/
 			%let window_list = 7 30 90 180 365;
 			%let lag=&minlag;
@@ -416,7 +417,7 @@
 		code=
 			%unquote(%str(%"))
 			%let names=; /*будущий список выходных переменных для proc cas */
-			%let minlag=91; /*параметр MinLag*/
+			%let minlag=35; /*параметр MinLag*/
 			/*-=-=-=-=-= min_lag + окна -=-=-=-=-=-*/
 			%let window_list = 7 30 90 180 365;
 			%let lag=&minlag;

@@ -46,6 +46,7 @@
 			lmvResTypeLoad
 			lmvFieldTmFrame
 			lmvTmFrameVal
+			lmvActualRowsCount
 	;
 	
 	%let lmvResource = %lowcase(&mpResource.);
@@ -319,6 +320,7 @@
 			COMMIT;
 		);
 	quit;
+	%fmk_load_etl_ia_error_check(mpResId = &lmvResId. ,mpResource = &lmvResource.);
 	
 	%if %length(&lmvPkList.) gt 0 %then %do;
 		%if &lmvHashDiffsLength. gt 0 %then %do;
@@ -358,6 +360,13 @@
 		
 		%put Table &lmvResource. was fully uploaded from etl_stg (There are no primary keys);
 	%end;
+	
+	proc sql noprint;
+		SELECT COUNT(*) INTO :lmvActualRowsCount
+		FROM ETL_IA.&lmvResource.
+		WHERE valid_to_dttm>datetime();
+	quit;
+	
 	%fmk_load_etl_ia_error_check(mpResId = &lmvResId. ,mpResource = &lmvResource.);
 	
 	proc sql noprint;
@@ -368,6 +377,7 @@
 			,uploaded_from_source=&lmvCntRowsSource.
 			,uploaded_to_target=&lmvCntRowsTarget.
 			,updated=&lmvCntUpdatedRows.
+			,actual_count=&lmvActualRowsCount.
 		where exec_dttm = (select max(exec_dttm) as max
 					from etl_cfg.cfg_resource_registry where resource_id = &lmvResId. and status_cd = 'P');
 		)

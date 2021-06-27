@@ -9,8 +9,8 @@
 							,mpAssignFlg= y
 							);
 
-	%let forecast_start_dt = date '2020-10-01';
-	%let forecast_end_dt = date '2020-10-31';
+	%let forecast_start_dt = %str(date%')%sysfunc(putn(&ETL_CURRENT_DT., yymmdd10.))%str(%');
+	%let forecast_end_dt = %str(date%')%sysfunc(putn(%sysfunc(intnx(day,&ETL_CURRENT_DT.,92)), yymmdd10.))%str(%');
 
 	%local	lmvMode
 			lmvInputTbl
@@ -24,7 +24,7 @@
 	%member_names (mpTable=&mpOutTableNm, mpLibrefNameKey=lmvLibrefOut, mpMemberNameKey=lmvTabNmOut);
 	
 	%if &mpAuth. = YES %then %do;
-		%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+		%tech_get_token(mpUsername=&SYS_ADM_USER., mpOutToken=tmp_token);
 		
 		filename resp TEMP;
 		proc http

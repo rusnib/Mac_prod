@@ -304,7 +304,7 @@
 	run;
 
 	data CASUSER.pbo_sales (replace=yes drop=valid_from_dttm valid_to_dttm keep=PBO_LOCATION_ID CHANNEL_CD SALES_DT RECEIPT_QTY GROSS_SALES_AMT NET_SALES_AMT);
-		set &lmvInLib..pbo_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		set &lmvInLib..pbo_sales(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm. and sales_dt>='01JAN2017'd));
 		/* and sales_dt>=%sysfunc(intnx(year,&VF_HIST_START_DT_SAS.,0, b)) and sales_dt<=%sysfunc(intnx(year,&VF_HIST_END_DT_SAS.,0,e)))); */
 	run;
 	

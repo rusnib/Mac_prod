@@ -36,7 +36,7 @@
 						);
 						
 	%tech_update_resource_status(mpStatus=P, mpResource=short_vf_run_project_pbo);
-	%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+	%tech_get_token(mpUsername=&SYS_ADM_USER., mpOutToken=tmp_token);
 	%vf_run_project_rec(mpProjectName=&VF_GC_NM.);
 
 	%tech_update_resource_status(mpStatus=L, mpResource=short_vf_run_project_pbo);

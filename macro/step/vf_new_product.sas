@@ -1,17 +1,42 @@
-%macro vf_new_product(mpInCaslib=casshort);
+%macro vf_new_product(mpInCaslib=mn_short);
 
 	*option dsoptions=nonote2err;
 	/***** 1. �������� ���������� ������ *****/
 	%local lmvInCaslib 
-			lmvReportDttm
-			lmvInLib
-			lmvFilter
-			;
+		lmvReportDttm
+		lmvInLib
+		lmvFilter
+		;
 	%let lmvInCaslib = &mpInCaslib.;
 	%let lmvReportDttm = %sysfunc(datetime());
 	%let lmvInLib=ETL_IA;
-	%let lmvFilter = t1.channel_cd = 'ALL'; 
-	/* ��������� Lifecycle = N � ������ ���� ��� */
+	%let lmvFilter = t1.channel_cd = 'ALL';
+
+	%if %sysfunc(exist(mn_short.product_chain))=0 %then %do;
+		%add_promotool_marks2(mpOutCaslib=mn_short,
+							mpPtCaslib=pt);
+		proc fedsql sessref=casauto noprint;
+			create table casuser.product_chain{options replace=true} as
+			  select 
+				LIFECYCLE_CD
+				,PREDECESSOR_DIM2_ID
+				,PREDECESSOR_PRODUCT_ID
+				,SCALE_FACTOR_PCT
+				,SUCCESSOR_DIM2_ID
+				,SUCCESSOR_PRODUCT_ID
+				,PREDECESSOR_END_DT
+				,SUCCESSOR_START_DT
+			  /*from mn_short.product_chain_enh*/
+			  from mn_short.product_chain
+			;
+		quit;
+
+		proc casutil;
+		  promote casdata="product_chain" incaslib="casuser" outcaslib="mn_short";
+		run;
+	%end;
+
+	/* Фильтруем Lifecycle = N и меняем типы дат */
 	proc fedsql sessref=casauto;
 		create table casuser.n_product_chain{options replace=true} as
 			select
@@ -21,7 +46,7 @@
 				SUCCESSOR_PRODUCT_ID,
 				SUCCESSOR_DIM2_ID,
 				datepart(SUCCESSOR_START_DT) as SUCCESSOR_START_DT,
-				coalesce(datepart(PREDECESSOR_END_DT) , date %tslit(&VF_FC_AGG_END_DT)) as PREDECESSOR_END_DT,
+				coalesce(datepart(PREDECESSOR_END_DT), date %tslit(&VF_FC_AGG_END_DT)) as PREDECESSOR_END_DT,
 				SCALE_FACTOR_PCT
 			from
 				&lmvInCaslib..product_chain
@@ -29,10 +54,22 @@
 				LIFECYCLE_CD = 'N'
 		;
 	quit;
-
-	/* ���������� ��������� ������ */
+	
+	/* Cначала избавляемся от дублей по ПБО */
+	proc fedsql sessref=casauto;
+		create table casuser.without_pbo{option replace=true} as
+			select distinct
+				PREDECESSOR_PRODUCT_ID,
+				SUCCESSOR_START_DT,
+				PREDECESSOR_END_DT
+			from
+				casuser.n_product_chain
+		;
+	quit;
+	
+	/* Объединяем интервалы продаж */
 	data casuser.n_product_chain_expand;
-		set casuser.n_product_chain;
+		set casuser.without_pbo;
 		keep PREDECESSOR_PRODUCT_ID period_dt;
 		format period_dt DATE9.;
 		period_dt=SUCCESSOR_START_DT;
@@ -41,8 +78,8 @@
 			period_dt=intnx('day',period_dt,1,'b');
 		end;
 	run;
-
-	/* ��������� ���������� ���� �����-���� */
+	
+	/* Оставляем уникальные пары товар-дата */
 	proc fedsql sessref=casauto;
 		create table casuser.n_product_chain_union{options replace=true} as
 			select distinct
@@ -52,8 +89,8 @@
 				casuser.n_product_chain_expand
 		;
 	quit;
-
-	/* ��������������� ������� ��� �������� ���������� ������ */
+	
+	/* Подготоваливаем таблицу для рассчета интервалов продаж */
 	data casuser.n_product_chain_union_interval;
 		set casuser.n_product_chain_union;
 		format period_dt intnx_lag DATE9.;
@@ -78,8 +115,8 @@
 					output;
 			end;
 	run;
-
-	/* ������� ��������� ������ */
+	
+	/* Считаем интервалы продаж */
 	proc fedsql sessref=casauto;
 		create table casuser.n_product_chain_union_interval2{options replace=true} as
 			select
@@ -94,8 +131,8 @@
 				i
 		;
 	quit;
-
-	/* ��������� ������� ������ � ����������� ���������� */
+	
+	/* Соединяем историю продаж с актуальными значениями */
 	proc fedsql sessref=casauto; 
 		create table casuser.pmix_sales{options replace=true} as
 			select 
@@ -105,15 +142,16 @@
 				datepart(t1.SALES_DT) as sales_dt,
 				coalesce(sum(t1.SALES_QTY,t1.SALES_QTY_PROMO), 0) as sum_qty,
 				divide(coalesce(t1.GROSS_SALES_AMT, 0), coalesce(sum(t1.SALES_QTY,t1.SALES_QTY_PROMO), 0)) as price
-	 from &lmvInCaslib..pmix_sales as t1 
+			from 
+				&lmvInCaslib..pmix_sales as t1 
 			where
 				&lmvFilter and
 				t1.SALES_DT >= &vf_hist_start_dt and
-				t1.SALES_DT <= date %tslit(&vf_hist_end_dt) 
+				t1.SALES_DT <= date %tslit(&vf_hist_end_dt)
 	;
 	quit;
-
-	/* ���������� ������� � ��������� */
+	
+	/* Агрегируем таблицу с продажами */
 	proc fedsql sessref=casauto; 
 		create table casuser.pmix_sales_aggr{options replace=true} as
 			select
@@ -129,8 +167,8 @@
 				sales_dt			
 		;
 	quit;
-
-	/* ��������� ������������ PLM � ��������������� ��������� */
+	
+	/* Соединяем объединенный PLM с агрегированными продажами */
 	proc fedsql sessref=casauto; 
 		create table casuser.pmix_plm{options replace=true} as
 			select
@@ -150,8 +188,8 @@
 				t1.sales_dt >= t2.period_start_dt
 		;
 	quit;
-
-	/* ������� �������� ���� ������ (����� ������� ���������) */
+	
+	/* Считаем настощую дату старта (когда продажы ненулевые) */
 	proc fedsql sessref=casauto; 
 		create table casuser.pmix_plm2{options replace=true} as
 			select
@@ -171,8 +209,8 @@
 				period_end_dt		
 		;
 	quit;
-
-	/* ��������� ������ ����� ������ (������ �� 2 ������ 2017) */
+	
+	/* Оставляем только новые товары (начало не 2 января 2017) */
 	proc fedsql sessref=casauto; 
 		create table casuser.pmix_plm3{options replace=true} as
 			select
@@ -187,8 +225,8 @@
 				real_start_dt ^= &VF_HIST_START_DT.
 		;
 	quit;
-
-	/* ������� �������� ��������� */
+	
+	/* Убираем короткие интервалы */
 	proc fedsql sessref=casauto; 
 		create table casuser.new_product_interval{options replace=true} as
 			select
@@ -199,12 +237,13 @@
 				period_end_dt
 			from
 				casuser.pmix_plm3
-			/* where
-				(period_end_dt - period_start_dt) > 1 */
+			where
+				(period_end_dt - period_start_dt) > 1
 		;
 	quit;
-
+	
 	proc casutil;
+	  droptable casdata="without_pbo" incaslib="casuser" quiet;
 	  droptable casdata="n_product_chain" incaslib="casuser" quiet;
 	  droptable casdata="n_product_chain_expand" incaslib="casuser" quiet;
 	  droptable casdata="n_product_chain_union" incaslib="casuser" quiet;
@@ -216,17 +255,17 @@
 	  droptable casdata="pmix_plm3" incaslib="casuser" quiet;
 		
 	 * promote casdata="new_product_interval" incaslib="casuser" outcaslib="casuser";
-
+	
 	run;
-
-
-	/****** 2. �������� ��������� ������� ******/
+	
+	
+	/****** 2. Собираем обучающую выборку ******/
 	proc casutil;
 		droptable casdata="real_end_interval" incaslib="casuser" quiet;
 		droptable casdata="new_product_train" incaslib="casuser" quiet;
 	run;
-
-	/* �������� �������� ������ ��������� ����� ������� ��� ����� */
+	
+	/* Отрезаем интервал продаж последней датой истории или годом */
 	proc fedsql sessref=casauto;
 		create table casuser.real_end_interval{options replace=true} as
 			select
@@ -243,8 +282,8 @@
 				casuser.new_product_interval	
 		;
 	quit;
-
-	/* ��������� ������� */
+	
+	/* Добавляем продажи */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_train{options replace=true} as
 			select
@@ -268,15 +307,15 @@
 				t1.sales_dt >= t2.period_start_dt
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="real_end_interval" incaslib="casuser" quiet;
 	run;
-
-
-	/****** 3. �������� ������������ ���������� ������� � ��������� ������� *******/
-
-	/* 3.2 �������� ������������ ��� ���������� ������� */
+	
+	
+	/****** 3. Добаляем коэффициенты недельного профиля к обучающей выборке *******/
+	
+	/* 3.2 Собираем коэффициенты для недельного профиля */
 	proc casutil;
 		droptable casdata="npf_frame" incaslib="casuser" quiet;
 		droptable casdata="npf_weekday_mean" incaslib="casuser" quiet;
@@ -286,8 +325,8 @@
 		droptable casdata="npf_weekday_profile3" incaslib="casuser" quiet;
 		droptable casdata="npf_weekday_profile4" incaslib="casuser" quiet;
 	run;
-
-	/* ������� ������ */
+	
+	/* Создаем каркас */
 	proc fedsql sessref=casauto;
 		create table casuser.npf_frame{options replace=true} as
 			select
@@ -299,8 +338,8 @@
 				(select distinct PROD_LVL2_ID from &lmvInCaslib..product_dictionary) as t2	
 		;
 	quit;
-
-	/* ��������� ��������� ������� � ������� ��������� ������� */
+	
+	/* Добавляем категории товаров и считаем недельный профиль */
 	proc fedsql sessref=casauto;
 		create table casuser.pmix_sales2{options replace=true} as
 			select
@@ -349,9 +388,9 @@
 				t1.month = t2.month
 		;
 	quit;
-
-	/* �� ��� ���� ��������� ���������� ����������, ����� ���������� ��������� ������� */
-	/* ��� ����� ��������� �������� ��������� �������, ����������� �� ��������� ������ */
+	
+	/* Не для всех категорий достаточно статистики, чтобы определить недельный профиль */
+	/* Для таких категорий поставим недельный профиль, независящий от категории продаж */
 	proc fedsql sessref=casauto;
 		create table casuser.npf_weekday_mean2{options replace=true} as
 			select
@@ -388,8 +427,8 @@
 				t1.month = t2.month
 		;
 	quit;
-
-	/* ������ ���� ����������, ������� ������������ ���������� */
+	
+	/* Ставим флаг категориям, имеющим недостаточно статистики */
 	proc fedsql sessref=casauto;
 		create table casuser.npf_weekday_profile3{options replace=true} as
 			select
@@ -413,8 +452,8 @@
 				t1.PROD_LVL2_ID = t2.PROD_LVL2_ID
 		;
 	quit;
-
-	/* ���������� ������� */
+	
+	/* Объединяем таблицы */
 	proc fedsql sessref=casauto;
 		create table casuser.npf_weekday_profile4{options replace=true} as 
 			select distinct
@@ -440,7 +479,7 @@
 				t1.PROD_LVL2_ID = t3.PROD_LVL2_ID	
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="npf_frame" incaslib="casuser" quiet;
 		droptable casdata="npf_weekday_mean" incaslib="casuser" quiet;
@@ -449,15 +488,15 @@
 		droptable casdata="npf_weekday_profile2" incaslib="casuser" quiet;
 		droptable casdata="npf_weekday_profile3" incaslib="casuser" quiet;
 	run;
-
-
-	/* 3.3 ��������� ����������� ������������ � ��������� ������� */
-	/* ��������� ��������� �������, ���� ������ � ����� */
+	
+	
+	/* 3.3 Добавляем посчитанные коэффициенты к обучающей выборке */
+	/* Добавляем категории товаров, день недели и месяц */
 	proc casutil;
 		droptable casdata="new_product_train2" incaslib="casuser" quiet;
 		droptable casdata="new_product_train3" incaslib="casuser" quiet;
 	run;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_train2{options replace=true} as
 			select
@@ -481,8 +520,8 @@
 				t1.product_id = t2.product_id
 		;
 	quit;
-
-	/* �������� ����������� ���������� ������� */
+	
+	/* Добаляем коэффициент недельного профиля */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_train3{options replace=true} as
 			select
@@ -509,13 +548,13 @@
 				t1.weekday = t2.weekday
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="new_product_train" incaslib="casuser" quiet;
 		droptable casdata="new_product_train2" incaslib="casuser" quiet;
 	run;
-
-	/****** 3. ������� ����������� ������� ******/
+	
+	/****** 4. Соберем скоринговую витрину ******/
 	proc casutil;
 		droptable casdata="last_day_ts" incaslib="casuser" quiet;
 		droptable casdata="future_assort_matrix" incaslib="casuser" quiet;
@@ -525,7 +564,8 @@
 		droptable casdata="future_product_scoring" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt" incaslib="casuser" quiet;
 	run;
-	/* ���������� ��������� ����, ������������� � ��������� ���� ������� */
+	
+	/* Определяем временные ряды, закончившиеся в последний день истории */
 	proc fedsql sessref=casauto;
 		create table casuser.last_day_ts{options replace=true} as
 			select
@@ -548,16 +588,16 @@
 			) as t1
 		;
 	quit;
-
+	
 	%let fc_end= %sysfunc(intnx(day,&vf_fc_start_dt_sas, 365),yymmddd10.); /*�������� ��������������� ������ ����� �������*/
-
+	
 	/* ���������� ���������� ����� � ������� last_day_ts � ����������� TS, ���� ������ ����*/
 	%tech_count_rows_cas(mpInLibref=casuser
 							,mpInTableNm=last_day_ts
 							,mpVar=mvCntLastDayTs);
 							
 	%if &mvCntLastDayTs. gt 0 %then %do;
-		/* ����������� ��������� ���� �� ��� */
+		/* Протягиваем временные ряды на год */
 		proc cas;
 		timeData.timeSeries result =r /
 			series={
@@ -578,7 +618,8 @@
 		run;
 		quit;
 	%end;
-	/* ����� �� product_chain ����� ������, �������� ����������� � �������� */
+	
+	/* Берем из product_chain новые товары, начавшие продаваться в будующем */
 	proc fedsql sessref=casauto;
 		create table casuser.future_product_chain{options replace=true} as
 			select
@@ -593,8 +634,8 @@
 				datepart(SUCCESSOR_START_DT) > date %tslit(&vf_hist_end_dt)
 		;
 	quit;
-
-	/* �������� ��� ��������� */
+	
+	/* Продляем эти интервалы */
 	data casuser.future_product_scoring;
 		set casuser.future_product_chain;
 		drop period_end_dt;
@@ -606,7 +647,7 @@
 			end;
 		end;
 	run;
-
+	
 	/* ���������� ���������� ����� � ������� last_day_ts � ����������� TS, ���� ������ ����*/
 	%tech_count_rows_cas(mpInLibref=casuser
 							,mpInTableNm=future_product_scoring
@@ -615,7 +656,8 @@
 	%if &mvCntFtrProdScor. eq 0 %then %do;
 		%return;
 	%end;
-		/* ���������� ����������� ������� ��� ����� ������� ��� ������� � � �������� */
+	
+	/* Объединяем скоринговую витрину для новых товаров без истории и с историей */
 	data casuser.new_product_scoring;	
 		set casuser.future_product_scoring 
 			%if &mvCntLastDayTs. gt 0 %then %do;
@@ -623,7 +665,8 @@
 			%end;
 		;
 	run;
-	/* ������� ��������� � ����������� ������� */
+	
+	/* Убираем дубликаты в скоринговой витрине */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_scoring{options replace=true} as
 			select
@@ -632,7 +675,7 @@
 				product_id,
 				sales_dt,
 				mean(sum_qty) as sum_qty,
-				max(PERIOD_START_DT) as PERIOD_START_DT /* ���� ������ ����� ��������� */
+				max(PERIOD_START_DT) as PERIOD_START_DT /* Дату старта берем последнюю */
 			from
 				casuser.new_product_scoring
 			group by
@@ -642,25 +685,25 @@
 				sales_dt
 		;
 	quit;
-
-	/* ���������� ����������� ������� � ��������� */
+	
+	/* Объединяем скоринговую витрину с обучающей */
 	data casuser.new_product_abt;
-	set casuser.new_product_scoring casuser.new_product_train3;
+		set casuser.new_product_scoring casuser.new_product_train3;
 	run;
-
+	
 	proc casutil;
 		droptable casdata="last_day_ts" incaslib="casuser" quiet;
 		droptable casdata="existing_product_scoring" incaslib="casuser" quiet;
-		droptable casdata="new_product_scoring" incaslib="casuser" quiet;
+		*droptable casdata="new_product_scoring" incaslib="casuser" quiet;
 	run;
-
-	/****** 4. ��������� �� ������ ******/
+	
+	/****** 5. Агрегация до недель ******/
 	proc casutil;
 		droptable casdata="week_start" incaslib="casuser" quiet;
 		droptable casdata="week_aggr" incaslib="casuser" quiet;
 	run;
-
-	/* ����������� ���� � ������ */
+	
+	/* Преобразуем даты в недели */
 	proc fedsql sessref=casauto;
 		create table casuser.week_start{options replace=true} as
 			select
@@ -669,7 +712,7 @@
 				product_id,
 				PERIOD_START_DT,
 				cast(intnx('week.2',PERIOD_START_DT,0,'b') as date)  as start_week,
-				cast(intnx('week.2',sales_dt,0,'b') as date)  as week,
+				cast(intnx('week.2',sales_dt,0,'b') as date) as week,
 				sum_qty,
 				sales_dt,
 				weekday_profile
@@ -677,17 +720,16 @@
 				casuser.new_product_abt
 		;
 	quit;
-
-	/* ������ ���������� ���� ������ ������ � ������ � ��������� ������� �� ������ */
+	
+	/* Считем количество дней продаж товара в неделю и суммарные продажи за неделю */
 	proc fedsql sessref=casauto;
 		create table casuser.week_aggr{options replace=true} as
 			select
 				channel_cd,
 				pbo_location_id,
 				product_id,
-				PERIOD_START_DT,
-				start_week,
 				week,
+				min(start_week) as start_week, /* если товар прервал свои продажи посреди недели, то считаем начало минимальным*/
 				count(sales_dt) as count_sales_dt,
 				sum(sum_qty) as sum_qty,
 				sum(weekday_profile) as sum_weekday_profile		
@@ -697,18 +739,16 @@
 				channel_cd,
 				pbo_location_id,
 				product_id,
-				PERIOD_START_DT,
-				start_week,
 				week
 		;
 	quit;
-
-
-	/****** 6. ���������� ������� � ������ ������ ******/
+	
+	
+	/****** 6. Исправляем продажи в первую неделю ******/
 	proc casutil;
 		droptable casdata="new_product_abt2" incaslib="casuser" quiet;
 	run;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt2{options replace=true} as
 			select
@@ -728,13 +768,13 @@
 				casuser.week_aggr
 		;
 	quit;
-
-
-	/****** 7. ������� ���������� ������ � ������ ������ ******/
+	
+	
+	/****** 7. Считаем количество недель с начала продаж ******/
 	proc casutil;
 		droptable casdata="new_product_abt3" incaslib="casuser" quiet;
 	run;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt3{options replace=true} as
 			select
@@ -752,18 +792,26 @@
 				casuser.new_product_abt2
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="new_product_abt2" incaslib="casuser" quiet;
 	run;
-
-	/****** 7. ��������� �������� ��������� ******/
+	
+	/****** 8. Добавляем атрибуты ресторана ******/
 	proc casutil;
 	  droptable casdata="new_product_abt4" incaslib="casuser" quiet;
 	run;
-
-	/* ������������� ��������� ����������. */
+	
+	/* Перекодировка текстовых переменных. */
 	%macro text_encoding(table, variable);
+		/*
+		Параметры:
+			table : таблица в которой хотим заненить текстовую переменную
+			variable : название текстовой переменной
+		Выход:
+			* Таблица table с дополнительным столбцом variable_id
+			* Таблица encoding_variable с привозкой id к старым значениям
+		*/
 	
 		%local	lmvOutLibref
 			lmvOutTabName
@@ -774,7 +822,7 @@
 		proc casutil;
 			droptable casdata="encoding_&variable." incaslib="casuser" quiet;
 		run;
-
+	
 		proc fedsql sessref=casauto;
 			create table casuser.unique{options replace=true} as
 				select distinct
@@ -783,20 +831,20 @@
 					&table. 
 				;
 		quit;
-
+	
 		data work.unique;
 			set casuser.unique;
 		run;
-
+	
 		data work.encoding_&variable.;
 			set work.unique;
 			&variable._id = _N_;
 		run;
-
+	
 		data casuser.encoding_&variable.;
 			set work.encoding_&variable.;
 		run;
-
+	
 		proc fedsql sessref = casauto;
 			create table casuser.&lmvOutTabName.{options replace=true} as 
 				select
@@ -825,7 +873,7 @@
 	%text_encoding(casuser.pbo_dictionary, A_PRICE_LEVEL);
 	%text_encoding(casuser.pbo_dictionary, A_DRIVE_THRU);
 	%text_encoding(casuser.pbo_dictionary, A_WINDOW_TYPE);
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt4{options replace=true} as
 			select
@@ -857,13 +905,13 @@
 				t1.pbo_location_id = t2.pbo_location_id
 		;
 	quit;
-
+	
 	proc casutil;
 	  droptable casdata="new_product_abt3" incaslib="casuser" quiet;
 	run;
-
-
-	/****** 8. ��������� �������� ������ ******/
+	
+	
+	/****** 9. Добавляем атрибуты товара ******/
 	proc casutil;
 	  droptable casdata="new_product_abt5" incaslib="casuser" quiet;
 	run;
@@ -872,7 +920,7 @@
 	%text_encoding(casuser.product_dictionary, a_item_size);
 	%text_encoding(casuser.product_dictionary, a_offer_type);
 	%text_encoding(casuser.product_dictionary, a_price_tier);
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt5{options replace=true} as
 			select
@@ -911,13 +959,13 @@
 			t1.product_id = t2.product_id
 		;
 	quit;
-
+		
 	proc casutil;
 	  droptable casdata='new_product_abt4' incaslib='casuser' quiet;
 	run;
-
-
-	/****** 9. ��������� �������������� ******/
+	
+	
+	/****** 10. Добавляем макроэкономику ******/
 	proc casutil;
 	  droptable casdata="macro_ml" incaslib="casuser" quiet;
 	  droptable casdata="macro2_ml" incaslib="casuser" quiet;
@@ -925,11 +973,12 @@
 	  droptable casdata="macro_transposed_ml2" incaslib="casuser" quiet;
 	  droptable casdata="new_product_abt6" incaslib="casuser" quiet;
 	run;
+	
 	/* update macro in caslib */
 	data casuser.macro (replace=yes  drop=valid_from_dttm valid_to_dttm);
 		set &lmvInLib..macro_factor(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
 	run;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.macro_ml{options replace=true} as 
 			select 
@@ -938,7 +987,7 @@
 				FACTOR_CHNG_PCT
 			from casuser.macro;
 	quit;
-
+	
 	data casuser.macro2_ml;
 		format period_dt date9.;
 		drop pdt;
@@ -951,7 +1000,7 @@
 			period_dt=intnx('day',period_dt,1,'b');
 		end;
 	run;
-
+	
 	proc cas;
 	transpose.transpose /
 	   table={name="macro2_ml", caslib="casuser", groupby={"period_dt"}} 
@@ -961,8 +1010,8 @@
 	   id={"factor_cd"} 
 	   casout={name="macro_transposed_ml", caslib="casuser", replace=true};
 	quit;
-
-	/* ��������� �������������� �� ������� */
+	
+	/* Усредняем макроэкономику по неделям */
 	proc fedsql sessref=casauto;
 		create table casuser.macro_transposed_ml2{options replace=true} as
 			select
@@ -983,8 +1032,8 @@
 				t1.week
 		;
 	quit;
-
-	/* ��������� �������������� */
+	
+	/* Добавляем макроэкономику */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt6{options replace=true} as
 			select
@@ -1026,19 +1075,17 @@
 			t1.week = t2.week
 		;
 	quit;
-
+	
 	proc casutil;
 	  droptable casdata="macro2_ml" incaslib="casuser" quiet;
 	  droptable casdata="macro_transposed_ml" incaslib="casuser" quiet;
 	  droptable casdata="macro_transposed_ml2" incaslib="casuser" quiet;
 	  droptable casdata="new_product_abt5" incaslib="casuser" quiet;
 	run;
-
-
-	/****** 10. ����� ******/
+	
+	
+	/****** 10. Промо ******/
 	proc casutil;
-		droptable casdata="pbo_hier_flat" incaslib="casuser" quiet;
-		droptable casdata="product_hier_flat" incaslib="casuser" quiet;
 		droptable casdata="lvl5" incaslib="casuser" quiet;
 		droptable casdata="lvl4" incaslib="casuser" quiet;
 		droptable casdata="lvl3" incaslib="casuser" quiet;
@@ -1047,20 +1094,18 @@
 		droptable casdata="pbo_lvl_all" incaslib="casuser" quiet;
 		droptable casdata="product_lvl_all" incaslib="casuser" quiet;
 		droptable casdata="promo_ml" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed2" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed3" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed4" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed5" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed6" incaslib="casuser" quiet;
+		droptable casdata="promo_ml_daily" incaslib="casuser" quiet;
+		droptable casdata="promo_mechanics" incaslib="casuser" quiet;
+		droptable casdata="promo_mechanics_one_hot" incaslib="casuser" quiet;
+		droptable casdata="promo_mechanics_one_hot_zero" incaslib="casuser" quiet;
+		droptable casdata="promo_ml_daily_one_hot" incaslib="casuser" quiet;
+		droptable casdata="promo_aggr" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt7" incaslib="casuser" quiet;
 		droptable casdata="ia_promo_x_product_leaf" incaslib="casuser" quiet;
 		droptable casdata="ia_promo_x_pbo_leaf" incaslib="casuser" quiet;
-		droptable casdata="promo_ml_main_code" incaslib="casuser" quiet;
-		droptable casdata="abt_promo" incaslib="casuser" quiet;
 	run;
-
-	/* ������� ������� ����������� PBO �� �������� ������ � �� ����� ������ */
+	
+	/* Создаем таблицу связывающую PBO на листовом уровне и на любом другом */
 	proc fedsql sessref=casauto;
 		create table casuser.lvl4{options replace=true} as 
 			select distinct
@@ -1091,13 +1136,13 @@
 				casuser.pbo_dictionary
 		;
 	quit;
-
-	/* ��������� � ������ ���������� ��� */
+	
+	/* Соединяем в единый справочник ПБО */
 	data casuser.pbo_lvl_all;
 		set casuser.lvl4 casuser.lvl3 casuser.lvl2 casuser.lvl1;
 	run;
-
-	/* ������� ������� ����������� ������ �� �������� ������ � �� ����� ������ */
+	
+	/* Создаем таблицу связывающую товары на листовом уровне и на любом другом */
 	proc fedsql sessref=casauto;
 		create table casuser.lvl5{options replace=true} as 
 			select distinct
@@ -1135,19 +1180,20 @@
 				casuser.product_dictionary
 		;
 	quit;
-
-	/* ��������� � ������ ���������� ��� */
+	
+	/* Соединяем в единый справочник ПБО */
 	data casuser.product_lvl_all;
 		set casuser.lvl5 casuser.lvl4 casuser.lvl3 casuser.lvl2 casuser.lvl1;
 	run;
-
-	/* ��������� � ������� ����� ��� � ������ */
+	
+	/* Добавляем к таблице промо ПБО и товары */
 	proc fedsql sessref = casauto;
 		create table casuser.ia_promo_x_pbo_leaf{options replace = true} as 
 			select distinct
 				t1.promo_id,
 				t2.PBO_LEAF_ID
 			from
+				/*&lmvInCaslib..promo_pbo_enh as t1,*/
 				&lmvInCaslib..promo_pbo as t1,
 				casuser.pbo_lvl_all as t2
 			where t1.pbo_location_id = t2.PBO_LOCATION_ID
@@ -1157,6 +1203,7 @@
 				t1.promo_id,
 				t2.product_LEAF_ID
 			from
+				/*&lmvInCaslib..promo_prod_enh as t1,*/
 				&lmvInCaslib..promo_prod as t1,
 				casuser.product_lvl_all as t2
 			where t1.product_id = t2.product_id
@@ -1164,30 +1211,17 @@
 		create table casuser.promo_ml{options replace = true} as 
 			select
 				t1.PROMO_ID,
-				t3.product_LEAF_ID,
-				t2.PBO_LEAF_ID,
-				t1.PROMO_NM,
-				t1.PROMO_PRICE_AMT,
+				t3.product_LEAF_ID as product_id,
+				t2.PBO_LEAF_ID as pbo_location_id,
 				datepart(t1.START_DT) as start_dt,
 				datepart(t1.END_DT) as end_dt,
 				t1.CHANNEL_CD,
-				t1.NP_GIFT_PRICE_AMT,
-				t1.PROMO_MECHANICS,
-				t1.PROMO_GROUP_ID,
-				(case
-					when t1.PROMO_MECHANICS = 'BOGO / 1+1' then 'bogo'
-					when t1.PROMO_MECHANICS = 'Discount' then 'discount'
-					when t1.PROMO_MECHANICS = 'EVM / Set' then 'evm_set'
-					when t1.PROMO_MECHANICS = 'Gift for purchase: Non-Product' then 'non_product_gift'
-					when t1.PROMO_MECHANICS = 'Pairs' then 'pairs'
-					when t1.PROMO_MECHANICS = 'Gift for purchase (for product)' then 'product_gift'
-					when t1.PROMO_MECHANICS = 'Other: Discount for volume' then 'other_discount'
-					when t1.PROMO_MECHANICS = 'Undefined' then 'other_digital'
-					when t1.PROMO_MECHANICS = 'NP Promo Support' then 'support'
-				end) as promo_mechanics_name,
+				t1.promo_group_id,
+				compress(promo_mechanics,'', 'ak') as promo_mechanics_name,
 				1 as promo_flag		
 			from
-				&lmvInCaslib..promo as t1 
+				/*&lmvInCaslib..promo_enh as t1*/
+				&lmvInCaslib..promo as t1				
 			left join
 				casuser.ia_promo_x_pbo_leaf as t2
 			on 
@@ -1199,108 +1233,103 @@
 		;
 	quit;
 
-	/* ������������� ������� � ����� �� ����� ����� ������ */
-	proc cas;
-	transpose.transpose /
-		table = {
-			name="promo_ml",
-			caslib="casuser",
-			groupby={"promo_id", "product_LEAF_ID", "PBO_LEAF_ID", "CHANNEL_CD", "START_DT", "END_DT"}}
-		transpose={"promo_flag"} 
-		id={"promo_mechanics_name"} 
-		casout={name="promo_transposed", caslib="casuser", replace=true};
-	quit;
-
-	proc fedsql sessref=casauto;
-		create table casuser.promo_transposed2{options replace=true} as
-			select 
-				product_leaf_id,
-				pbo_leaf_id,
-				channel_cd,
-				start_dt,
-				end_dt,
-				coalesce(bogo, 0) as bogo,
-				coalesce(discount, 0) as discount,
-				coalesce(evm_set, 0) as evm_set,
-				coalesce(non_product_gift, 0) as non_product_gift,
-				coalesce(pairs, 0) as pairs,
-				coalesce(product_gift, 0) as product_gift,
-				coalesce(other_discount, 0) as other_discount,
-				coalesce(other_digital, 0) as other_digital,
-				coalesce(support, 0) as support
-			from
-				casuser.promo_transposed
-		;
-	quit;
-
-	data casuser.promo_transposed3;
-		set casuser.promo_transposed2;
+	/* Расшиваем интервалы по дням */
+	data casuser.promo_ml_daily;
+		set casuser.promo_ml;
 		format sales_dt DATE9.;
 		do sales_dt=start_dt to end_dt;
 			output;
 		end;
 	run;
-
-	/* ������� ��������� ���� ����� */
+	
+	/* Определяем механики промо акций */
 	proc fedsql sessref=casauto;
-		create table casuser.promo_transposed4{options replace=true} as
-			select
-				t1.*,
-				cast(intnx('week.2',t1.sales_dt,0,'b') as date)  as week
+		create table casuser.promo_mechanics{options replace=true} as
+			select distinct
+				promo_id,
+				promo_mechanics_name,
+				promo_flag
 			from
-				casuser.promo_transposed3 as t1
+				casuser.promo_ml
+		;
+	quit;
+	
+	/* Транспонируем механику промо в вектор */
+	proc cas;
+	transpose.transpose /
+		table = {
+			name="promo_mechanics",
+			caslib="casuser",
+			groupby={"promo_id"}}
+		transpose={"promo_flag"} 
+		id={"promo_mechanics_name"} 
+		casout={name="promo_mechanics_one_hot", caslib="casuser", replace=true};
+	quit;
+	
+	/* Заменяем пропуски на нули */
+	data casuser.promo_mechanics_one_hot_zero;
+		set casuser.promo_mechanics_one_hot;
+		drop _name_;
+		array change _numeric_;
+	    	do over change;
+	            if change=. then change=0;
+	        end;
+	run ;
+	
+	/* Добавляем переменные к витрине */
+	proc fedsql sessref=casauto;
+		create table casuser.promo_ml_daily_one_hot{options replace=true} as
+			select
+				t1.pbo_location_id,
+				t1.product_id,
+				t1.sales_dt,
+				intnx('week.2',t1.sales_dt,0,'b') as week,
+				t2.*
+			from
+				casuser.promo_ml_daily as t1
+			left join
+				casuser.promo_mechanics_one_hot_zero as t2
+			on
+				t1.promo_id = t2.promo_id
 		;
 	quit;
 
-	/* ����������� �� ������ */
+	
+	/* Считаем кол-во сработавших промо в рамках всех каналов */
 	proc fedsql sessref=casauto;
-		create table casuser.promo_transposed5{options replace=true} as
+		create table casuser.promo_aggr{options replace=true} as
 			select
 				t1.week,
-				t1.pbo_leaf_id,
-				t1.product_leaf_id,
-				sum(t1.bogo) as bogo,
-				sum(t1.discount) as discount,
-				sum(t1.evm_set) as evm_set,
-				sum(t1.non_product_gift) as non_product_gift,
-				sum(t1.other_discount) as other_discount,
-				sum(t1.other_digital) as other_digital,
-				sum(t1.pairs) as pairs,
-				sum(t1.product_gift) as product_gift,
-				sum(t1.support) as support
+				t1.pbo_location_id,
+				t1.product_id,
+				sum(t1.BOGO) as BOGO,
+				sum(t1.Bundle) as Bundle,
+				sum(t1.Discount) as Discount,
+				sum(t1.EVMSet) as EVMSet,
+				sum(t1.GiftforpurchaseforordersaboveXru) as GiftforpurchaseforordersaboveXru,
+				sum(t1.Giftforpurchaseforproduct) as Giftforpurchaseforproduct,
+				sum(t1.GiftforpurchaseNonProduct) as GiftforpurchaseNonProduct,
+				sum(t1.GiftforpurchaseSampling) as GiftforpurchaseSampling,
+				sum(t1.NPPromoSupport) as NPPromoSupport,
+				sum(t1.OtherDiscountforvolume) as OtherDiscountforvolume,
+				sum(t1.Pairs) as Pairs,
+				sum(t1.Pairsdifferentcategories) as Pairsdifferentcategories,
+				sum(t1.Productlineextension) as Productlineextension,
+				sum(t1.ProductnewlaunchLTO) as ProductnewlaunchLTO,
+				sum(t1.ProductnewlaunchPermanentinclite) as ProductnewlaunchPermanentinclite,
+				sum(t1.Productrehitsameproductnolineext) as Productrehitsameproductnolineext,
+				sum(t1.Temppricereductiondiscount) as Temppricereductiondiscount,
+				sum(t1.Undefined) as Undefined
 			from
-				casuser.promo_transposed4 as t1
+				casuser.promo_ml_daily_one_hot as t1
 			group by
 				t1.week,
-				t1.pbo_leaf_id,
-				t1.product_leaf_id
+				t1.pbo_location_id,
+				t1.product_id
 		;
 	quit;
-
-	/* ��������� �� ������� */
-	proc fedsql sessref=casauto;
-		create table casuser.promo_transposed6{options replace=true} as
-			select	
-				t1.pbo_leaf_id,
-				t1.product_leaf_id,
-				divide(sum(t1.bogo), 7) as bogo,
-				divide(sum(t1.discount), 7) as discount,
-				divide(sum(t1.evm_set), 7) as evm_set,
-				divide(sum(t1.non_product_gift), 7) as non_product_gift,
-				divide(sum(t1.other_discount), 7) as other_discount,
-				divide(sum(t1.other_digital), 7) as other_digital,
-				divide(sum(t1.pairs), 7) as pairs,
-				divide(sum(t1.product_gift), 7) as product_gift,
-				divide(sum(t1.support), 7) as support
-			from casuser.promo_transposed4 as t1
-			group by
-				t1.pbo_leaf_id,
-				t1.product_leaf_id,
-				t1.week
-		;
-	quit;
-
-	/* ��������� � �������� */
+	
+	/* Соединяем с витриной */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt7{options replace=true} as
 			select
@@ -1334,58 +1363,63 @@
 				t1.CPI,
 				t1.GPD,
 				t1.RDI,
-				coalesce(t2.bogo, 0) as bogo,
-				coalesce(t2.discount, 0) as discount,
-				coalesce(t2.evm_set, 0) as evm_set,
-				coalesce(t2.non_product_gift, 0) as non_product_gift,
-				coalesce(t2.other_discount, 0) as other_discount,
-				coalesce(t2.other_digital, 0) as other_digital,
-				coalesce(t2.pairs, 0) as pairs,
-				coalesce(t2.product_gift, 0) as product_gift,
-				coalesce(t2.support, 0) as support
+				coalesce(t2.BOGO, 0) as BOGO,
+				coalesce(t2.Bundle, 0) as Bundle,
+				coalesce(t2.Discount, 0) as Discount, 
+				coalesce(t2.EVMSet, 0) as EVMSet,
+				coalesce(t2.GiftforpurchaseforordersaboveXru, 0) as GiftforpurchaseforordersaboveXru,
+				coalesce(t2.Giftforpurchaseforproduct, 0) as Giftforpurchaseforproduct,
+				coalesce(t2.GiftforpurchaseNonProduct, 0) as GiftforpurchaseNonProduct,
+				coalesce(t2.GiftforpurchaseSampling, 0) as GiftforpurchaseSampling,
+				coalesce(t2.NPPromoSupport, 0) as NPPromoSupport,
+				coalesce(t2.OtherDiscountforvolume, 0) as OtherDiscountforvolume,
+				coalesce(t2.Pairs, 0) as Pairs,
+				coalesce(t2.Pairsdifferentcategories, 0) as Pairsdifferentcategories,
+				coalesce(t2.Productlineextension, 0) as Productlineextension,
+				coalesce(t2.ProductnewlaunchLTO, 0) as ProductnewlaunchLTO,
+				coalesce(t2.ProductnewlaunchPermanentinclite, 0) as ProductnewlaunchPermanentinclite,
+				coalesce(t2.Productrehitsameproductnolineext, 0) as Productrehitsameproductnolineext,
+				coalesce(t2.Temppricereductiondiscount, 0) as Temppricereductiondiscount,
+				coalesce(t2.Undefined, 0) as Undefined
 		from
 			casuser.new_product_abt6 as t1
 		left join
-			casuser.promo_transposed5 as t2
+			casuser.promo_aggr as t2
 		on
-			t1.product_id = t2.product_leaf_id and
-			t1.pbo_location_id = t2.pbo_leaf_id and
+			t1.product_id = t2.product_id and
+			t1.pbo_location_id = t2.pbo_location_id and
 			t1.week = t2.week 
 		;
 	quit;
-
+	
 	proc casutil;
-		droptable casdata="ia_pbo_loc_hierarchy" incaslib="casuser" quiet;
-		droptable casdata="ia_product_hierarchy" incaslib="casuser" quiet;
-		droptable casdata="ia_promo" incaslib="casuser" quiet;
-		droptable casdata="ia_promo_x_pbo" incaslib="casuser" quiet;
-		droptable casdata="ia_promo_x_product" incaslib="casuser" quiet;	
-		droptable casdata="pbo_hier_flat" incaslib="casuser" quiet;
-		droptable casdata="product_hier_flat" incaslib="casuser" quiet;
 		droptable casdata="lvl5" incaslib="casuser" quiet;
 		droptable casdata="lvl4" incaslib="casuser" quiet;
 		droptable casdata="lvl3" incaslib="casuser" quiet;
 		droptable casdata="lvl2" incaslib="casuser" quiet;
 		droptable casdata="lvl1" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed2" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed3" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed4" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed5" incaslib="casuser" quiet;
-		droptable casdata="promo_transposed6" incaslib="casuser" quiet;
+		droptable casdata="pbo_lvl_all" incaslib="casuser" quiet;
+		droptable casdata="product_lvl_all" incaslib="casuser" quiet;
+		droptable casdata="promo_ml_daily" incaslib="casuser" quiet;
+		droptable casdata="promo_mechanics" incaslib="casuser" quiet;
+		droptable casdata="promo_mechanics_one_hot" incaslib="casuser" quiet;
+		droptable casdata="promo_mechanics_one_hot_zero" incaslib="casuser" quiet;
+		droptable casdata="promo_ml_daily_one_hot" incaslib="casuser" quiet;
+		droptable casdata="promo_aggr" incaslib="casuser" quiet;
+		droptable casdata="ia_promo_x_product_leaf" incaslib="casuser" quiet;
+		droptable casdata="ia_promo_x_pbo_leaf" incaslib="casuser" quiet;
+
 		droptable casdata="new_product_abt6" incaslib="casuser" quiet;
-		droptable casdata="promo_ml_main_code" incaslib="casuser" quiet;
-		droptable casdata="abt_promo" incaslib="casuser" quiet;
 	run;
-
-
-	/****** 11. ������ ******/
+	
+	
+	/****** 11. Погода ******/
 	proc casutil;
 		droptable casdata="ia_weather2" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt8" incaslib="casuser" quiet;
 	run;
-
-	/* ������� ������� ����������� � ������ */
+	
+	/* Считаем среднюю температуру в неделю */
 	proc fedsql sessref=casauto;
 		create table casuser.ia_weather2{options replace=true} as
 			select
@@ -1407,8 +1441,8 @@
 				t1.week
 		;
 	quit;
-
-	/* ��������� � �������� */
+	
+	/* Соединяем с витриной */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt8{options replace=true} as
 			select
@@ -1442,15 +1476,24 @@
 				t1.CPI,
 				t1.GPD,
 				t1.RDI,
-				t1.bogo,
-				t1.discount,
-				t1.evm_set,
-				t1.non_product_gift,
-				t1.other_discount,
-				t1.other_digital,
-				t1.pairs,
-				t1.product_gift,
-				t1.support,
+				t1.BOGO,
+				t1.Bundle,
+				t1.Discount,
+				t1.EVMSet,
+				t1.GiftforpurchaseforordersaboveXru,
+				t1.Giftforpurchaseforproduct,
+				t1.GiftforpurchaseNonProduct,
+				t1.GiftforpurchaseSampling,
+				t1.NPPromoSupport,
+				t1.OtherDiscountforvolume,
+				t1.Pairs,
+				t1.Pairsdifferentcategories,
+				t1.Productlineextension,
+				t1.ProductnewlaunchLTO,
+				t1.ProductnewlaunchPermanentinclite,
+				t1.Productrehitsameproductnolineext,
+				t1.Temppricereductiondiscount,
+				t1.Undefined,
 				t2.PRECIPITATION,
 				t2.TEMPERATURE
 		from
@@ -1462,14 +1505,14 @@
 			t1.week = t2.week
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="new_product_abt7" incaslib="casuser" quiet;
 		droptable casdata="ia_weather2" incaslib="casuser" quiet;
 	run;
-
-
-	/****** 12. TRP ����������� ******/
+	
+	
+	/****** 12. TRP конкурентов ******/
 	proc casutil;
 		droptable casdata="comp_media_ml" incaslib="casuser" quiet;
 		droptable casdata="comp_transposed_ml" incaslib="casuser" quiet;
@@ -1477,7 +1520,7 @@
 		droptable casdata="comp_transposed_ml_expand2" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt9" incaslib="casuser" quiet;
 	run;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.comp_media_ml{options replace=true} as 
 			select
@@ -1488,8 +1531,8 @@
 				&lmvInCaslib..COMP_MEDIA
 		;
 	quit;
-
-	/* ������������� ������� */
+	
+	/* Транспонируем таблицу */
 	proc cas;
 	transpose.transpose /
 	   table={name="comp_media_ml", caslib="casuser", groupby={"REPORT_DT"}} 
@@ -1498,7 +1541,7 @@
 	   id={"COMPETITOR_CD"} 
 	   casout={name="comp_transposed_ml", caslib="casuser", replace=true};
 	quit;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt9{options replace=true} as
 			select
@@ -1532,15 +1575,24 @@
 				t1.CPI,
 				t1.GPD,
 				t1.RDI,
-				t1.bogo,
-				t1.discount,
-				t1.evm_set,
-				t1.non_product_gift,
-				t1.other_discount,
-				t1.other_digital,
-				t1.pairs,
-				t1.product_gift,
-				t1.support,
+				t1.BOGO,
+				t1.Bundle,
+				t1.Discount,
+				t1.EVMSet,
+				t1.GiftforpurchaseforordersaboveXru,
+				t1.Giftforpurchaseforproduct,
+				t1.GiftforpurchaseNonProduct,
+				t1.GiftforpurchaseSampling,
+				t1.NPPromoSupport,
+				t1.OtherDiscountforvolume,
+				t1.Pairs,
+				t1.Pairsdifferentcategories,
+				t1.Productlineextension,
+				t1.ProductnewlaunchLTO,
+				t1.ProductnewlaunchPermanentinclite,
+				t1.Productrehitsameproductnolineext,
+				t1.Temppricereductiondiscount,
+				t1.Undefined,
 				t1.PRECIPITATION,
 				t1.TEMPERATURE,
 				coalesce(t2.comp_trp_BK, 0) as comp_trp_BK,
@@ -1553,7 +1605,7 @@
 			t1.week = t2.REPORT_DT
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="comp_media_ml" incaslib="casuser" quiet;
 		droptable casdata="comp_transposed_ml" incaslib="casuser" quiet;
@@ -1561,9 +1613,9 @@
 		droptable casdata="comp_transposed_ml_expand2" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt8" incaslib="casuser" quiet;
 	run;
-
-
-	/****** 13. ����� ��������� ******/
+	
+	
+	/****** 13. Медиа поддержка ******/
 	proc casutil;
 	  droptable casdata="ia_promo_x_pbo_leaf" incaslib="casuser" quiet;
 	  droptable casdata="ia_promo_x_product_leaf" incaslib="casuser" quiet;
@@ -1573,14 +1625,14 @@
 	  droptable casdata="sum_trp2" incaslib="casuser" quiet;
 	  droptable casdata="new_product_abt10" incaslib="casuser" quiet;
 	run;
-
-	/* ��������� trp � ������� ����� */
+	
+	/* Добавляем trp к таблице промо */
 	proc fedsql sessref=casauto;
 		create table casuser.promo_ml_trp{options replace = true} as 
 			select 
 				t1.PROMO_ID,
-				t1.product_LEAF_ID,
-				t1.PBO_LEAF_ID,
+				t1.product_ID,
+				t1.pbo_location_id,
 				t1.start_dt,
 				t1.end_dt,
 				mean(t2.TRP) as mean_trp
@@ -1594,62 +1646,62 @@
 				datepart(t2.report_dt) >= t1.start_dt
 			group by
 				t1.PROMO_ID,
-				t1.product_LEAF_ID,
-				t1.PBO_LEAF_ID,
+				t1.product_ID,
+				t1.PBO_Location_ID,
 				t1.start_dt,
 				t1.end_dt
 		;
 	quit;
-
-	/* ��������� �� ���� */
+	
+	/* Расшиваем по дням */
 	data casuser.promo_ml_trp_expand;
 		set casuser.promo_ml_trp;
 		do sales_dt=start_dt to end_dt;
 			output;
 		end;
 	run;
-
-	/* ��������� TRP �� ���� ����� */
+	
+	/* Суммируем TRP от всех промо */
 	proc fedsql sessref=casauto;
 		create table casuser.promo_ml_trp2{options replace=true} as
 			select
-				product_LEAF_ID,
-				PBO_LEAF_ID,
+				product_id,
+				pbo_Location_id,
 				sales_dt,
 				sum(mean_trp) as sum_trp
 			from
 				casuser.promo_ml_trp_expand as t1
 			group by
-				product_LEAF_ID,
-				PBO_LEAF_ID,
+				product_id,
+				pbo_location_id,
 				sales_dt			
 		;
 	quit;
-
-	/* ��������� ������ � ��������� �� ������� */
+	
+	/* Добавляем неделю и усредняем по неделям */
 	proc fedsql sessref=casauto;
 		create table casuser.promo_ml_trp3{options replace=true} as 
 			select
-				t1.PRODUCT_LEAF_ID,
-				t1.PBO_LEAF_ID,
+				t1.PRODUCT_ID,
+				t1.PBO_location_id,
 				t1.week,
 				mean(t1.sum_trp) as sum_trp
 			from (
 				select
-					t1.PRODUCT_LEAF_ID,
-					t1.PBO_LEAF_ID,
+					t1.PRODUCT_ID,
+					t1.PBO_location_ID,
 					cast(intnx('week.2',t1.sales_dt,0,'b') as date)  as week,
 					t1.sum_trp
 				from
 					casuser.promo_ml_trp2 as t1
 			) as t1
 			group by
-				t1.PRODUCT_LEAF_ID,
-				t1.PBO_LEAF_ID,
+				t1.PRODUCT_ID,
+				t1.PBO_Location_ID,
 				t1.week			
 		;
 	quit;
-
+	
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt10{options replace=true} as
 			select
@@ -1684,15 +1736,24 @@
 				t1.CPI,
 				t1.GPD,
 				t1.RDI,
-				t1.bogo,
-				t1.discount,
-				t1.evm_set,
-				t1.non_product_gift,
-				t1.other_discount,
-				t1.other_digital,
-				t1.pairs,
-				t1.product_gift,
-				t1.support,
+				t1.BOGO,
+				t1.Bundle,
+				t1.Discount,
+				t1.EVMSet,
+				t1.GiftforpurchaseforordersaboveXru,
+				t1.Giftforpurchaseforproduct,
+				t1.GiftforpurchaseNonProduct,
+				t1.GiftforpurchaseSampling,
+				t1.NPPromoSupport,
+				t1.OtherDiscountforvolume,
+				t1.Pairs,
+				t1.Pairsdifferentcategories,
+				t1.Productlineextension,
+				t1.ProductnewlaunchLTO,
+				t1.ProductnewlaunchPermanentinclite,
+				t1.Productrehitsameproductnolineext,
+				t1.Temppricereductiondiscount,
+				t1.Undefined,
 				t1.PRECIPITATION,
 				t1.TEMPERATURE,
 				t1.comp_trp_BK,
@@ -1703,12 +1764,12 @@
 		left join
 			casuser.promo_ml_trp3 as t2
 		on
-			t1.product_id = t2.product_leaf_id and	
-			t1.pbo_location_id = t2.pbo_leaf_id and
+			t1.product_id = t2.product_id and	
+			t1.pbo_location_id = t2.pbo_location_id and
 			t1.week = t2.week
 		;
 	quit;
-
+	
 	proc casutil;
 		droptable casdata="ia_promo_x_pbo_leaf" incaslib="casuser" quiet;
 		droptable casdata="ia_promo_x_product_leaf" incaslib="casuser" quiet;
@@ -1722,23 +1783,25 @@
 		droptable casdata="ia_promo_x_pbo" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt9" incaslib="casuser" quiet;
 	run;
-
-	/****** 14. ��������� ���������� � ��������� ������� ������ ������ ******/
+	
+	/****** 14. Добавляем информацию о доступной истории продаж товара ******/
 	proc casutil;
 		droptable casdata="new_product_abt11" incaslib="casuser" quiet;
 	run;
-
+	
+	options nomlogic nomprint nosymbolgen nosource nonotes;
+	
 	data casuser.new_product_abt11;
 		set casuser.new_product_abt10;
 		by PRODUCT_ID PBO_LOCATION_ID CHANNEL_CD week;
 		array all_row_values{512} _temporary_;
 		retain i;
 		drop i l_sum_qty;
-		if first.CHANNEL_CD then do; /*������ ����������, ���������� ������ � ������� �������*/
+		if first.CHANNEL_CD then do; /* первое наблюдение, сбрасываем массив и счетчик массива */
 			call missing(of all_row_values{*});
 			i=1;
 		end;
-		l_sum_qty=lag(sum_qty); /*�� ������� ������� �� ���� i �� ���������� ��������� ��������� ��� ��������*/
+		l_sum_qty=lag(sum_qty); /* мы считаем агрегат на шаге i по предыдущим известным значениям без текущего */
 		if i=1 then l_sum_qty=.;
 		all_row_values{i}=l_sum_qty;
 		avg=mean(of all_row_values{*});
@@ -1751,54 +1814,47 @@
 		min=min(of all_row_values{*});
 		max=max(of all_row_values{*});
 		range=max-min;
-		cv=std/avg;
+		cv=divide(std,avg);
 		i+1;
 	run;
-
+	
+	options mlogic mprint symbolgen source notes;
+	
 	proc casutil;
 		droptable casdata="new_product_abt10" incaslib="casuser" quiet;
 	run;
-
-	/****** 15. ���������� ���� ******/
+	
+	/****** 15. Добавление цены ******/
+	
 	proc casutil;
-	  droptable casdata="price_ml" incaslib="casuser" quiet;
 	  droptable casdata="price_ml2" incaslib="casuser" quiet;
-	  droptable casdata="price_ml3" incaslib="casuser" quiet;
 	  droptable casdata="new_product_abt12" incaslib="casuser" quiet;
 	run;
-
-	/* ��������� �� ���� */
-	data casuser.price_ml2;
-		set &lmvInCaslib..price_ml;
-		drop start_dt end_dt;
-		do sales_dt=start_dt to end_dt;
-			output;
-		end;
-	run;
-
-	/* ���������� �� ������� */
+	
 	proc fedsql sessref=casauto;
-		create table casuser.price_ml3{options replace=true} as
+		create table casuser.price_ml2{option replace=true} as
 			select
 				t1.pbo_location_id,
 				t1.product_id,
 				t1.week,
-				mean(t1.gross_price_amt) as mean_price
-			from (
-				select
-					*,
-					cast(intnx('week.2',sales_dt,0,'b') as date)  as week
-				from
-					casuser.price_ml2
-			) as t1
+				mean(t2.gross_price_amt) as mean_price
+			from
+				casuser.new_product_abt11 as t1
+			left join
+				&lmvInCaslib..price_ml as t2
+			on
+				t1.pbo_location_id = t2.pbo_location_id and
+				t1.product_id = t2.product_id and
+				t1.week <= t2.end_dt and
+				t1.week >= t2.start_dt
 			group by
 				t1.pbo_location_id,
 				t1.product_id,
 				t1.week
 		;
 	quit;
-
-	/* ��������� � �������� ���� */
+	
+	/* Добавляем к продажам цены */
 	proc fedsql sessref=casauto; 
 		create table casuser.new_product_abt12{options replace=true} as 
 			select
@@ -1833,15 +1889,24 @@
 				t1.CPI,
 				t1.GPD,
 				t1.RDI,
-				t1.bogo,
-				t1.discount,
-				t1.evm_set,
-				t1.non_product_gift,
-				t1.other_discount,
-				t1.other_digital,
-				t1.pairs,
-				t1.product_gift,
-				t1.support,
+				t1.BOGO,
+				t1.Bundle,
+				t1.Discount,
+				t1.EVMSet,
+				t1.GiftforpurchaseforordersaboveXru,
+				t1.Giftforpurchaseforproduct,
+				t1.GiftforpurchaseNonProduct,
+				t1.GiftforpurchaseSampling,
+				t1.NPPromoSupport,
+				t1.OtherDiscountforvolume,
+				t1.Pairs,
+				t1.Pairsdifferentcategories,
+				t1.Productlineextension,
+				t1.ProductnewlaunchLTO,
+				t1.ProductnewlaunchPermanentinclite,
+				t1.Productrehitsameproductnolineext,
+				t1.Temppricereductiondiscount,
+				t1.Undefined,
 				t1.PRECIPITATION,
 				t1.TEMPERATURE,
 				t1.comp_trp_BK,
@@ -1862,26 +1927,21 @@
 			from
 				casuser.new_product_abt11 as t1
 			left join
-				casuser.price_ml3 as t2
+				casuser.price_ml2 as t2
 			on
 				t1.pbo_location_id = t2.pbo_location_id and
 				t1.product_id = t2.product_id and
 				t1.week = t2.week
 		;
 	quit;
-
+	
 	proc casutil;
-	  droptable casdata="price_ml" incaslib="casuser" quiet;
 	  droptable casdata="price_ml2" incaslib="casuser" quiet;
-	  droptable casdata="price_ml3" incaslib="casuser" quiet;
-	  droptable casdata="ia_price_history" incaslib="casuser" quiet;
-	  droptable casdata="ia_price" incaslib="casuser" quiet;
 	  droptable casdata="new_product_abt11" incaslib="casuser" quiet;
-
 	run;
-
-
-	/****** 16. ��������� ��������� ******/
+	
+	
+	/****** 16. Добавляем рецептуру ******/
 	proc casutil;
 		droptable casdata="ingridients_transposed" incaslib="casuser" quiet;
 		droptable casdata="ingridients_transposed2" incaslib="casuser" quiet;
@@ -1890,8 +1950,8 @@
 		droptable casdata="ingridients_pca3" incaslib="casuser" quiet;
 		droptable casdata="new_product_abt13" incaslib="casuser" quiet;
 	run;
-
-	/* ������������� ��������� */
+	
+	/* Транспонируем рецептуру */
 	proc cas;
 	transpose.transpose /
 		table = {
@@ -1904,8 +1964,8 @@
 		id={"ASMB_ITEM_ID"} 
 		casout={name="ingridients_transposed", caslib="casuser", replace=true};
 	quit;
-
-	/* �������� �������� ������ */
+	
+	/* Заменяем пропуски нулями */
 	data casuser.ingridients_transposed2;
 		set casuser. ingridients_transposed;
 		array _xxx_ _numeric_;
@@ -1914,25 +1974,25 @@
 		end;
 		drop i _name_ _label_;
 	run;
-
-	/* ������� ������ ���������� (�� ����������� ID) */
+	
+	/* Создаем список переменных (за исключением ID) */
 	proc contents data=casuser.ingridients_transposed2 noprint out=_contents_;
 	run;
-
-	/* ��������� ������ ���������� � �������������� */
+	
+	/* Сохраняем список переменных в макропременные */
 	proc sql noprint;
 		select name into :names separated by ' ' from _contents_ where upcase(name) not in ('PRODUCT_ID', 'MONTH_DT');
 		select name into :sql_names separated by ',' from _contents_ where upcase(name) not in ('PRODUCT_ID', 'MONTH_DT');
 	quit;
-
+	
 	ods _all_ close;
-	/* ��������� �������� �� ������� ��������������� */
+	/* Выполняем проекцию на меньшее подпространство */
 	proc pca data=casuser.ingridients_transposed2 n=30 plots=none;
 		var &names.;
 		output out=casuser.ingridients_pca copyvars=(month_dt product_id);
 	run;
-
-	/* ������ ��� datetime �� date */
+	
+	/* Меняем тип datetime на date */
 	proc fedsql	sessref=casauto;
 		create table casuser.ingridients_pca2{options replace=true} as
 			select
@@ -1972,8 +2032,8 @@
 				casuser.ingridients_pca as t2
 		;
 	quit;
-
-	/* ����������� �������� �� ��� ���� ������ */
+	
+	/* Протягиваем рецептру на два года вперед */
 	proc cas;
 	timeData.timeSeries result =r /
 		series={
@@ -2021,8 +2081,8 @@
 		;
 	run;
 	quit;
-
-	/* ��������� ��������� � ������� */
+	
+	/* Добавляем рецептуру к витрине */
 	proc fedsql sessref=casauto;
 		create table casuser.new_product_abt13{options replace = true} as
 			select
@@ -2057,15 +2117,24 @@
 				t1.CPI,
 				t1.GPD,
 				t1.RDI,
-				t1.bogo,
-				t1.discount,
-				t1.evm_set,
-				t1.non_product_gift,
-				t1.other_discount,
-				t1.other_digital,
-				t1.pairs,
-				t1.product_gift,
-				t1.support,
+				t1.BOGO,
+				t1.Bundle,
+				t1.Discount,
+				t1.EVMSet,
+				t1.GiftforpurchaseforordersaboveXru,
+				t1.Giftforpurchaseforproduct,
+				t1.GiftforpurchaseNonProduct,
+				t1.GiftforpurchaseSampling,
+				t1.NPPromoSupport,
+				t1.OtherDiscountforvolume,
+				t1.Pairs,
+				t1.Pairsdifferentcategories,
+				t1.Productlineextension,
+				t1.ProductnewlaunchLTO,
+				t1.ProductnewlaunchPermanentinclite,
+				t1.Productrehitsameproductnolineext,
+				t1.Temppricereductiondiscount,
+				t1.Undefined,
 				t1.PRECIPITATION,
 				t1.TEMPERATURE,
 				t1.comp_trp_BK,
@@ -2102,7 +2171,8 @@
 				intnx('month',t1.week,0,'BEGINNING') = t2.month_dt
 		;
 	quit;
-
+	
+	
 	proc casutil;
 		droptable casdata="ia_ingridients" incaslib="casuser" quiet;
 		droptable casdata="ingridients_transposed" incaslib="casuser" quiet;
@@ -2113,9 +2183,9 @@
 		droptable casdata="new_product_abt12" incaslib="casuser" quiet;
 		promote casdata="new_product_abt13" incaslib="casuser" outcaslib="casuser";
 	run;
-
-
-	/****** 17. ���������� �� �������� � ������� ******/
+	
+	
+	/****** 17. Разделение на обучение и скоринг ******/
 	proc fedsql sessref=casauto;
 		create table casuser.npf_scoring{options replace=true} as
 			select
@@ -2134,12 +2204,13 @@
 				t1.week < &VF_FC_START_DT.
 		;
 	quit;
-
-	/****** 18. �������� ������ ******/
+	
+	
+	/****** 18. Обучение модели ******/
 	proc casutil;
 		droptable casdata="models_npf" incaslib="casuser" quiet;
 	run;
-
+	
 	%let pmix_default_params = seed=12345 loh=0 binmethod=QUANTILE 
 		 maxbranch=2 
 		 assignmissing=useinsearch 
@@ -2151,7 +2222,7 @@
 		 numbin=50
 		 printtarget
 	;
-
+	
 	proc forest data=casuser.npf_train
 		&pmix_default_params.;
 		input 
@@ -2160,15 +2231,24 @@
 			CPI
 			GPD
 			RDI
-			bogo
-			discount
-			evm_set
-			non_product_gift
-			other_discount
-			other_digital
-			pairs
-			product_gift
-			support
+			BOGO
+			Bundle
+			Discount
+			EVMSet
+			GiftforpurchaseforordersaboveXru
+			Giftforpurchaseforproduct
+			GiftforpurchaseNonProduct
+			GiftforpurchaseSampling
+			NPPromoSupport
+			OtherDiscountforvolume
+			Pairs
+			Pairsdifferentcategories
+			Productlineextension
+			ProductnewlaunchLTO
+			ProductnewlaunchPermanentinclite
+			Productrehitsameproductnolineext
+			Temppricereductiondiscount
+			Undefined
 			PRECIPITATION
 			TEMPERATURE
 			comp_trp_BK
@@ -2220,13 +2300,13 @@
 		grow VARIANCE;
 		savestate rstore=casuser.models_npf;
 	run;
-
+	
 	proc casutil;
 		promote casdata="models_npf" incaslib="casuser" outcaslib="casuser";
 	run;
-
-
-	/****** 19. ������� ******/
+	
+	
+	/****** 19. Скоринг ******/
 	proc casutil;
 		droptable casdata="npf_scoring_pred" incaslib="casuser" quiet;
 	run;
@@ -2236,16 +2316,10 @@
 	  rstore=casuser.models_npf
 	  out=casuser.npf_scoring_pred;
 	quit;
-
-
-	/****** 20. ������� �������� �� ���� ******/
-	/* 
-		������� ���� ��������� ��� ������ ����
-			��������������� ��������� | ����� 
-		������������ ������ � ������ ������� ������� �������
-		���� ����� �� �������� �� ��� ����� ��������� �������, �� 
-		����� ��� ������� ��������������� ������ ������ ������ mcd
-	*/
+	
+	
+	/****** 20. Деление прогноза по дням ******/
+	
 	proc casutil;
 		droptable casdata="npf_frame" incaslib="casuser" quiet;
 		droptable casdata="npf_weekday_mean" incaslib="casuser" quiet;
@@ -2255,8 +2329,8 @@
 		droptable casdata="npf_weekday_profile3" incaslib="casuser" quiet;
 		droptable casdata="npf_scoring_pred_day" incaslib="casuser" quiet;
 	run;
-
-	/* ����� ������� �� ���� */
+	
+	/* Делим прогноз по дням */
 	proc fedsql sessref=casauto;
 		create table casuser.npf_scoring_pred_day{options replace=true} as
 			select
@@ -2284,14 +2358,48 @@
 		;
 	quit;
 
-	/****** 21. ���������� � �������������� �������� � product chain ******/
+	
+	/****** 21. Пересекаем с ассортиментной матрицей и product chain ******/
 	proc casutil;
-	*	load data=&inlib..ia_assort_matrix casout='ia_assort_matrix' outcaslib='casuser' replace;
 		droptable casdata="npf_prediction" incaslib="casuser" quiet;
 	run;
 
-	/* ��������� ������� �� �����,
-	 ���� ���� ������� �� ���� � �� ��� ���� ������ � product chain � lifecycle=N */
+	/* Удаляем дубли из product_chain на будущее */
+	proc fedsql sessref=casauto;
+		create table casuser.future_product_scoring_distinct{options replace=true} as
+			select distinct
+				channel_cd,
+				product_id,
+				pbo_location_id,
+				sales_dt
+			from
+				casuser.future_product_scoring as t1			
+		;
+	quit;
+
+	/* Расшиваем интервалы в ассортиментой матрице */
+	data casuser.assort_matrix_daily;
+		set mn_short.assort_matrix;
+		format sales_dt DATE9.;
+		do sales_dt=start_dt to end_dt;
+			output;
+		end;
+	run;
+	
+	/* Удаляем дубли */
+	proc fedsql sessref=casauto;
+		create table casuser.assort_matrix_daily_unique{option replace=true} as
+			select distinct
+				pbo_location_id,
+				product_id,
+				sales_dt
+			from
+				casuser.assort_matrix_daily
+		;
+	quit;
+	
+	/* Оставляем прогноз на товар,
+	 если есть прогноз он есть в АМ или есть запись в product chain с lifecycle=N */
 	proc fedsql sessref=casauto;
 		create table casuser.npf_prediction{options replace=true} as
 			select
@@ -2309,28 +2417,29 @@
 			from
 				casuser.npf_scoring_pred_day as t1
 			left join
-				&lmvInCaslib..assort_matrix as t2
+				casuser.assort_matrix_daily_unique as t2
 			on
 				t1.product_id = t2.product_id and
 				t1.pbo_location_id = t2.pbo_location_id and
-				t1.sales_dt <= datepart(end_dt) and
-				t1.sales_dt >= datepart(start_dt)
+				t1.sales_dt = t2.sales_dt
 			left join
-				casuser.future_product_scoring as t3
+				casuser.future_product_scoring_distinct as t3
 			on
 				t1.product_id = t3.product_id and
 				t1.pbo_location_id = t3.pbo_location_id and
 				t1.sales_dt = t3.sales_dt
 			where
-				t2.product_id is not missing or t3.product_id is not missing
+				t2.product_id is not missing or
+				t3.product_id is not missing
 		;
-	quit;
-
-
+	quit;	
+	
 	proc casutil;
+		droptable casdata="assort_matrix_daily_unique" incaslib="casuser" quiet;
+		droptable casdata="assort_matrix_daily" incaslib="casuser" quiet;
 		droptable casdata="npf_weekday_profile4" incaslib="casuser" quiet;
 		promote casdata="npf_prediction" incaslib="casuser" outcaslib="casuser";
 	run;
 
-%mend vf_new_product;
 
+%mend vf_new_product;

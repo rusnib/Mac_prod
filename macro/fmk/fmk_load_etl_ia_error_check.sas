@@ -12,6 +12,10 @@
 		quit;
 		
 		%put ERROR: &mpResource. was uploaded unsuccessfully: %SYSFUNC(COMPRESS(%SYSFUNC(TRANWRD(ERROR: %NRQUOTE(&SYSERRORTEXT.), %STR(,), %STR(:))), %STR(''"")))!;
+		/* Закрываем процесс в etl_cfg.cfg_status_table и обновляем ресурс*/
+		%tech_update_resource_status(mpStatus=E, mpResource=STG_&lmvResource.);
+		%tech_log_event(mpMODE=END, mpPROCESS_NM=fmk_load_etl_ia_&lmvResource.);
+		
 		%abort;
 	%end;
 %mend fmk_load_etl_ia_error_check;

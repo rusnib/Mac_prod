@@ -2,17 +2,19 @@
 	Внерегламентный процесс.
 
 	1. Инициализация окружения
-	2. Рассчет эффективности промо акций на истории
+	2. Получение информации из промо тула [add_promotool_marks2.sas]
+		* Выделение уже прошедших промо акций
+	3. Рассчет эффективности промо акций на истории
 		a. Подсчет из чеков n_a (число срабатываний акций) и
 			 t_a(количество чеков с промо) [na_calculation.sas]
 		b. Сборка витрины для модели прогнозирования n_a (t_a)
 			[promo_effectiveness_abt_building.sas]
 		c. Обучение модели для прогнозирования n_a (t_a)
 			[promo_effectiveness_model_fitting.sas]
-	3. Линейная модель для GC
+	4. Линейная модель для GC
 		a. Сборка витрины [gc_abt_building.sas]
 		b. Обучение моделей [gc_model_fitting.sas]
-	4. Линейная модель для UPT
+	5. Линейная модель для UPT
 		a. Сборка витрины [upt_abt_building.sas]
 		b. Обучение моделей [upt_model_fitting.sas]
 */
@@ -36,15 +38,36 @@ libname nac "/data/MN_CALC"; /* Директория в которую скла�
 %assign
 
 
-/*** 2. Рассчет эффективности промо акций на истории ***/
+/*** 2. Получение информации из промо тула ***/
+%include '/opt/sas/mcd_config/macro/step/add_promotool_marks2.sas';
+%add_promotool_marks2(
+	mpOutCaslib=casuser,
+	mpPtCaslib=pt
+)
+
+/* Выделим только прошедшие промо акции */
+proc fedsql sessref=casauto;
+	create table casuser.past_promo{options replace=true} as
+		select
+			*
+		from
+			casuser.promo_enh
+		where
+			channel_cd = 'ALL' and
+			end_dt <= date '2021-04-12'
+	;
+quit;
+
+
+/*** 3. Рассчет эффективности промо акций на истории ***/
 
 /* a. Подсчет из чеков n_a и t_a */
 %include '/opt/sas/mcd_config/macro/step/pt/na_calculation.sas';
 %na_calculation(
-	promo_lib = public, 
-	ia_promo = ia_promo,
-	ia_promo_x_pbo = ia_promo_x_pbo,
-	ia_promo_x_product = ia_promo_x_product,
+	promo_lib = casuser, 
+	ia_promo = past_promo,
+	ia_promo_x_pbo = promo_pbo_enh,
+	ia_promo_x_product = promo_product_enh,
 	hist_start_dt = date '2019-01-01',
 	hist_end_dt =  date '2021-04-12',
 	filter = channel_cd = 'ALL' and promo_id ^= 745
@@ -53,10 +76,10 @@ libname nac "/data/MN_CALC"; /* Директория в которую скла�
 /* b. Сборка витрины для модели прогнозирования n_a и t_a */
 %include '/opt/sas/mcd_config/macro/step/pt/promo_effectiveness_abt_building.sas';
 %promo_effectiveness_abt_building(
-	promo_lib = public, 
-	ia_promo = ia_promo,
-	ia_promo_x_pbo = ia_promo_x_pbo,
-	ia_promo_x_product = ia_promo_x_product,
+	promo_lib = casuser, 
+	ia_promo = past_promo,
+	ia_promo_x_pbo = promo_pbo_enh,
+	ia_promo_x_product = promo_prod_enh,
 	hist_start_dt = date '2019-01-01',
 	filter = t1.channel_cd = 'ALL',
 	calendar_start = '01jan2017'd,
@@ -80,7 +103,7 @@ libname nac "/data/MN_CALC"; /* Директория в которую скла�
 )
 
 
-/*** 3. Линейная модель для GC ***/
+/*** 4. Линейная модель для GC ***/
 
 /* a. Сборка витрины */
 %include '/opt/sas/mcd_config/macro/step/pt/gc_abt_building.sas';
@@ -115,15 +138,15 @@ libname nac "/data/MN_CALC"; /* Директория в которую скла�
 )
 
 
-/**	4. Линейная модель для UPT **/
+/**	5. Линейная модель для UPT **/
 
 /* a. Сборка витрины [upt_abt_building.sas] */
 %include '/opt/sas/mcd_config/macro/step/pt/upt_abt_building.sas';
 %upt_abt_building(
-	promo_lib = public, 
-	ia_promo = ia_promo,
-	ia_promo_x_pbo = ia_promo_x_pbo,
-	ia_promo_x_product = ia_promo_x_product,
+	promo_lib = casuser, 
+	ia_promo = past_promo,
+	ia_promo_x_pbo = promo_pbo_enh,
+	ia_promo_x_product = promo_prod_enh,
 	period_start_dt = '1jan2019'd,
 	period_end_dt = '12apr2021'd
 )

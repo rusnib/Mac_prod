@@ -7,7 +7,7 @@
 			from IA.ETL_PROCESS_LOG
 			where 
 			/* IA_STATUS_CD = "L" and  */
-			datepart(IA_FINISH_DTTM) = date() 
+			datepart(IA_FINISH_DTTM) = date()
 			/* and  */
 			/* (SAS_START_DTTM is null or SAS_STATUS_CD="E") */
 		;
@@ -22,6 +22,11 @@
 			from (
 				select lowcase(resource_nm) as resource_nm
 				from work.ready_to_downl_res
+				/* Добавляем форсированные процессы */
+				union 
+				select lowcase(resource_nm) as resource_nm
+				from ETL_CFG.CFG_RESOURCE
+					where forced_load_flag eq 1
 				except 
 				select lowcase(resource_nm) as resource_nm
 				from ETL_CFG.CFG_STATUS_TABLE
@@ -29,15 +34,6 @@
 				)
 		;
 	quit;
-	
-	/* Перезапуск упавших ресурсов */
-	%if &ETL_RESTART_FAILED_PROCESSES.=YES %then %do;
-		proc sql;
-			update etl_cfg.cfg_status_table
-			set status_cd = 'A'
-			where status_cd ='E' ;
-		quit;
-	%end;
 
 	/* Открываем ресурсы */
 	%if %member_obs(mpData=work.ready_to_downl_res_checked) gt 0 %then %do;
@@ -48,6 +44,16 @@
 			run;
 			%tech_open_resource(mpResource=&res_nm.);
 		%end;
+	%end;
+	
+	/* Перезапуск упавших ресурсов */
+	%if &ETL_RESTART_FAILED_PROCESSES.=YES %then %do;
+		proc sql;
+			update etl_cfg.cfg_status_table
+			set status_cd = 'A',
+				retries_cnt = retries_cnt + 1
+			where status_cd ='E' AND retries_cnt <= &ETL_RETRIES_COUNT.;
+		quit;
 	%end;
 
 	/* 1. Получаем полный список по модулям */
@@ -135,8 +141,7 @@
 			 resource_id,
 			 resource_nm,
 			 status_cd,
-			 processed_dttm,
-			 batch_cycle_id
+			 processed_dttm
 	   from etl_cfg.cfg_status_table
 		  where ( 
 			 datepart(processed_dttm) = today()
@@ -212,9 +217,13 @@
 				%if &module_nm. eq etl_stg %then %do;
 					put "%nrstr(%%)fmk100_load_&module_nm.(mpResource=&resource_nm.)";
 				%end;
-				/* Загрузка данных из ETL_STG в ETL_IA */
+				/* Загрузка данных из ETL_STG в ETL_IA*/
 				%else %if &module_nm. eq etl_ia %then %do;
 					put "%nrstr(%%)fmk200_load_&module_nm.(mpResource=&resource_nm.)";
+				%end;
+				/* Загрузка данных в DP */
+				%else %if &module_nm. eq dp_int or &module_nm. eq dp_fact or &module_nm. eq dp_seed %then %do;
+					put "%nrstr(%%)rtp011_load_to_dp(mpJobNm=&resource_nm.)";
 				%end;
 				/* Запуск остальных процессов (индивидуальных) */
 				%else %do;
@@ -222,7 +231,7 @@
 				%end;
 			run;
 			/* Разделяем запуски для корректного создания логов */
-			%if &module_nm. eq etl_stg or &module_nm. eq etl_ia %then %do;
+			%if &module_nm. eq etl_stg or &module_nm. eq etl_ia or &module_nm. eq dp_int or &module_nm. eq dp_fact or &module_nm. eq dp_seed %then %do;
 				systask command 
 				"""/opt/sas/mcd_config/bin/start_sas.sh"" ""%sysfunc(pathname(par_&seq))"" &module_nm. &macro_nm._&resource_nm."
 				taskname=task_&seq status=rc_&seq;

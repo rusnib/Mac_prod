@@ -1,7 +1,63 @@
+
+
 /*
 	Просто тестирование результатов.
 	В дальнейшем этот скрипт можно будет удалить.
 */
+%macro daily_double(data);
+
+	proc fedsql sessref=casauto;
+		select
+			count(1) as cnt
+		from (
+			select
+				channel_cd,
+				pbo_location_id,
+				product_id,
+				sales_dt,
+				count(1) as cnt
+			from
+				&data.
+			group by
+				channel_cd,
+				pbo_location_id,
+				product_id,
+				sales_dt
+		) as t1
+		where
+			t1.cnt > 1
+		;
+	quit;
+
+%mend;
+
+%macro weekly_double(data);
+
+	proc fedsql sessref=casauto;
+		select
+			count(1) as cnt
+		from (
+			select
+				channel_cd,
+				pbo_location_id,
+				product_id,
+				week,
+				count(1) as cnt
+			from
+				&data.
+			group by
+				channel_cd,
+				pbo_location_id,
+				product_id,
+				week
+		) as t1
+		where
+			t1.cnt > 1
+		;
+	quit;
+
+%mend;
+
 
 proc sql;
 	select

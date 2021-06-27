@@ -4,8 +4,6 @@
 /* ********************************************************************* */
 /* ********************************************************************* */
 %macro vf_full_process;
-	
-	%tech_redirect_log(mpMode=START, mpJobName=vf_process, mpArea=Main);
 	/* 1. загрузка данных в CAS */
 	/* Значения параметров mpEvents mpEventsMkup выставлены по умолчанию,
 	*  если необходимо, значения можно изменить, но нужно учитывать, что таблица 
@@ -51,7 +49,7 @@
 	%tech_log_event(mpMode=END, mpProcess_Nm=vf_run_project_pbo);
 	%tech_redirect_log(mpMode=END, mpJobName=vf_run_project_pbo, mpArea=Main);
 	
-	/* Загрузка таблицы pmix_sal_abt*/
+	/*5. Загрузка таблицы pmix_sal_abt*/
 	/* Необходимо указать ИМЯ VF-проекта в параметре mpProjectName, построенного на mpPboSalAbt=casuser.pbo_sal_abt */
 	%tech_redirect_log(mpMode=START, mpJobName=vf_prepare_ts_abt_pmix, mpArea=Main);
 	%tech_log_event(mpMode=START, mpProcess_Nm=vf_prepare_ts_abt_pmix);
@@ -65,14 +63,14 @@
 	%tech_log_event(mpMode=END, mpProcess_Nm=vf_prepare_ts_abt_pmix);
 	%tech_redirect_log(mpMode=END, mpJobName=vf_prepare_ts_abt_pmix, mpArea=Main);
 	
-	/*5. Запуск VF-проекта на основе pmix_sal_abt*/
+	/*6. Запуск VF-проекта на основе pmix_sal_abt*/
 	/* Необходимо указать ИМЯ VF-проекта в параметре mpProjectName. Например, pmix_sales_v1*/
 	%tech_redirect_log(mpMode=START, mpJobName=vf_run_project_pmix, mpArea=Main);
 	%tech_log_event(mpMode=START, mpProcess_Nm=vf_run_project_pmix);
  		%vf_run_project(mpProjectName=&VF_PMIX_PROJ_NM.); 
  	%tech_log_event(mpMode=END, mpProcess_Nm=vf_run_project_pmix);
 	%tech_redirect_log(mpMode=END, mpJobName=vf_run_project_pmix, mpArea=Main);
-	/*6. Создание модели недельного профиля для разбивки по дням и переагрегации недель до месяцев*/
+	/*7. Создание модели недельного профиля для разбивки по дням и переагрегации недель до месяцев*/
 	%tech_redirect_log(mpMode=START, mpJobName=vf_train_week_profile, mpArea=Main);
 	%tech_log_event(mpMode=START, mpProcess_Nm=vf_train_week_profile);
 		%vf_train_week_profile(mpOutWpGc=mn_dict.wp_gc);
@@ -88,9 +86,9 @@
 	/* Параметры mpPrmt=Y/N (Будут ли указанные таблицы запромоучены) */
 	/* Параметр mpInWpGc = таблица, формируемая в vf_train_week_profile(параметр mpOutWpGc); */
 	/*8. Необходимо указать ИМЕНА VF-проектов в параметрах mpVfPmixProjName, mpVfPboProjName*/
-	%tech_redirect_log(mpMode=START, mpJobName=vf_month_aggregation, mpArea=Main);
-	%tech_log_event(mpMode=START, mpProcess_Nm=vf_month_aggregation);
-		%vf_month_aggregation(mpVfPmixProjName=&VF_PMIX_PROJ_NM.,
+	*%tech_redirect_log(mpMode=START, mpJobName=vf_month_aggregation, mpArea=Main);
+	*%tech_log_event(mpMode=START, mpProcess_Nm=vf_month_aggregation);
+		*%vf_month_aggregation(mpVfPmixProjName=&VF_PMIX_PROJ_NM.,
 								mpVfPboProjName=&VF_PBO_PROJ_NM.,
 								mpInEventsMkup=mn_long.events_mkup,
 								mpOutPmix=mn_long.plan_pmix_month,
@@ -100,8 +98,8 @@
 								mpOutNnetWp=mn_dict.nnet_wp1,
 								mpInWpGc=mn_dict.wp_gc,
 								mpPrmt=Y) ;
-	%tech_log_event(mpMode=END, mpProcess_Nm=vf_month_aggregation);
-	%tech_redirect_log(mpMode=END, mpJobName=vf_month_aggregation, mpArea=Main);
+	*%tech_log_event(mpMode=END, mpProcess_Nm=vf_month_aggregation);
+	*%tech_redirect_log(mpMode=END, mpJobName=vf_month_aggregation, mpArea=Main);
 	
 	/* 9. Выгрузка данных в CSV + в DP */
 	*%vf_6_out_integration(mpVfPmixProjName=pmix_sales_v1,
@@ -116,18 +114,4 @@
 								mpOutOutfor=casuser.TS_OUTFOR, 
 								mpOutNnetWp=mn_dict.nnet_wp1,
 								mpPrmt=N) ;
-
-	/*9. Экспорт в CSV */					
-	*%dp_export_csv(mpInput=dm_abt.plan_pmix_month
-							, mpTHREAD_CNT=30
-							, mpPath=/data/dm_rep/);						
-	*%dp_export_csv(mpInput=dm_abt.plan_gc_month
-							, mpTHREAD_CNT=30
-							, mpPath=/data/dm_rep/);	
-							
-	/*10. Запуск загрузки данных в DP */
-	*%dp_jobexecution(mpJobName=ACT_LOAD_GC_FoM);
-	*%dp_jobexecution(mpJobName=ACT_LOAD_QNT_FoM);
-
-	%tech_redirect_log(mpMode=END, mpJobName=vf_process, mpArea=Main);
 %mend vf_full_process;

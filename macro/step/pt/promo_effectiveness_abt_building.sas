@@ -1,34 +1,6 @@
 /* Скрипт собирающий обучающую выборку для модели, прогнозирующей Na */
 
 /* 
-	Загрузка промо таблиц из ингерационного слоя
-	В дальнейшем эти таблицы будут заменены на таблицы
-	из промо тула.
-*/
-proc casutil;
-	load data=etl_ia.promo(
-		where=(
-			&ETL_CURRENT_DTTM. <= valid_to_dttm and
-			&ETL_CURRENT_DTTM. >= valid_from_dttm
-		)
-	) casout='ia_promo' outcaslib='public' replace ;
-
-	load data=etl_ia.promo_x_pbo(
-		where=(
-			&ETL_CURRENT_DTTM. <= valid_to_dttm and
-			&ETL_CURRENT_DTTM. >= valid_from_dttm
-		)
-	) casout='ia_promo_x_pbo' outcaslib='public' replace;	
-
-	load data=etl_ia.promo_x_product(
-		where=(
-			&ETL_CURRENT_DTTM. <= valid_to_dttm and
-			&ETL_CURRENT_DTTM. >= valid_from_dttm
-		)
-	) casout='ia_promo_x_product' outcaslib='public' replace;
-run;
-
-/* 
 	Список выходных дней в РФ с 2018 по 2023.
 	Внутрь скрипта это data step положить не получается, поэтому
 	вынесен это шаг отдельно
@@ -103,7 +75,7 @@ datalines;
 run;
 
 
-%macro na_abt_building(
+%macro promo_effectiveness_abt_building(
 	promo_lib = public, 
 	ia_promo = ia_promo,
 	ia_promo_x_pbo = ia_promo_x_pbo,
@@ -117,20 +89,21 @@ run;
 	Макрос, который собирает обучающую выборку для модели прогнозирующей
 		na (и ta).
 	Схема вычислений:
-	1. Вычисление каркаса таблицы промо акций: промо, ПБО, товара, интервал, механика
+	1. Вычисление каркаса таблицы промо акций: промо, ПБО, товар, интервал, механика
 	2. One hot кодировка механики промо акции
 	3. Количество товаров, участвующих в промо (количество уникальных product_id),
 		количество позиций (количество уникальных option_number), 
 		количество единиц товара, необходимое для покупки
-	4. TRP <--- TODO
-	5. Пускай у нас имеется k товарных категорий, тогда создадим вектор размерности k.
+	4. TRP <--- TODO.
+	5. Цены <--- TODO.
+	6. Пускай у нас имеется k товарных категорий, тогда создадим вектор размерности k.
 		Каждая компонента этого вектора описывает количество товаров данной 
 		категории участвующих в промо.
-	6. Атрибуты ПБО
-	7. Календарные признаки и праздники
-	8. Признаки описывающие трафик ресторана (количество чеков)
-	9. Признаки описывающие продажи промо товаров
-	10. Добавление целевой переменной
+	7. Атрибуты ПБО
+	8. Календарные признаки и праздники
+	9. Признаки описывающие трафик ресторана (количество чеков)
+	10. Признаки описывающие продажи промо товаров
+	11. Добавление целевой переменной
 
 	Параметры:
 	----------
@@ -309,7 +282,7 @@ run;
 				t2.pbo_location_id,
 				t1.START_DT,
 				t1.END_DT,
-				(t1.END_DT - t1.START_DT) as promo_lifetime,
+				(t1.END_DT - t1.START_DT + 1) as promo_lifetime,
 				t1.CHANNEL_CD,
 				t1.NP_GIFT_PRICE_AMT,
 				t1.PROMO_GROUP_ID,
@@ -326,7 +299,8 @@ run;
 				and t1.start_dt >= &hist_start_dt.
 		;
 	quit;
-	
+
+		
 	/* Расшиваем интервалы по дням */
 	data public.na_abt1;
 		set public.promo_skelet;
@@ -336,6 +310,16 @@ run;
 		end;
 	run;
 	
+	/* Сохраняем связующие таблицы для скоринга */
+	data nac.pbo_lvl_all;
+		set public.pbo_lvl_all;
+	run;
+
+	data nac.product_lvl_all;
+		set public.product_lvl_all;
+	run;
+
+	/* Удаляем промежуточные таблицы */
 	proc casutil;
 		droptable casdata="ia_pbo_loc_hierarchy" incaslib="public" quiet;
 		droptable casdata="ia_product_hierarchy" incaslib="public" quiet;
@@ -398,6 +382,7 @@ run;
 				t1.NP_GIFT_PRICE_AMT,
 				t1.PROMO_GROUP_ID,
 				t1.sales_dt,
+				t1.promo_mechanics_name,
 				t2.*
 			from
 				public.na_abt1 as t1
@@ -407,6 +392,7 @@ run;
 				t1.promo_id = t2.promo_id
 		;
 	quit;
+
 	
 	proc casutil;
 		droptable casdata="na_abt1" incaslib="public" quiet;
@@ -471,6 +457,7 @@ run;
 				t1.promo_id = t3.promo_id	
 		;
 	quit;
+
 	
 	proc casutil;
 		droptable casdata="na_abt2" incaslib="public" quiet;
@@ -581,9 +568,10 @@ run;
 		;
 	quit;
 
-	/* Копируем таблицу product_dictionary_ml в work */
-	data work.product_dictionary_ml;
+	/* Копируем таблицу product_dictionary_ml в nac */
+	data nac.product_dictionary_ml;
 		set public.product_dictionary_ml;
+		category_name = translate(trim(prod_lvl2_nm),'_',' ', '_', '&', '_', '-');
 	run;
 	
 	/* Считаем количество товаров в категории */
@@ -837,6 +825,11 @@ run;
 				t1.pbo_location_id = t2.pbo_location_id
 		;
 	quit;
+
+	/* Копируем таблицу pbo_dictionary_ml в nac */
+	data nac.pbo_dictionary_ml;
+		set public.pbo_dictionary_ml;
+	run;
 	
 	proc casutil;
 		droptable casdata="na_abt4" incaslib="public" quiet;
@@ -940,17 +933,17 @@ run;
 				t2.year,
 				t2.regular_weekend_flag,
 				t2.weekend_flag,
-				t3.Christmas,
-				t3.Christmas_Day,
-				t3.Day_After_New_Year,
-				t3.Day_of_Unity,
-				t3.Defendence_of_the_Fatherland,
-				t3.International_Womens_Day,
-				t3.Labour_Day,
-				t3.National_Day,
-				t3.New_Year_shift,
-				t3.New_year,
-				t3.Victory_Day			 
+				coalesce(t3.Christmas, 0) as Christmas,
+				coalesce(t3.Christmas_Day, 0) as Christmas_Day,
+				coalesce(t3.Day_After_New_Year, 0) as Day_After_New_Year,
+				coalesce(t3.Day_of_Unity, 0) as Day_of_Unity,
+				coalesce(t3.Defendence_of_the_Fatherland, 0) as Defendence_of_the_Fatherland,
+				coalesce(t3.International_Womens_Day, 0) as International_Womens_Day,
+				coalesce(t3.Labour_Day, 0) as Labour_Day,
+				coalesce(t3.National_Day, 0) as National_Day,
+				coalesce(t3.New_Year_shift, 0) as New_Year_shift, 
+ 				coalesce(t3.New_year, 0) as New_year,
+				coalesce(t3.Victory_Day, 0) as Victory_Day		 
 			from
 				public.na_abt5 as t1
 			left join
@@ -1039,7 +1032,16 @@ run;
 				t1.weekday			
 		;
 	quit;
-	
+
+	/* Сохраняем таблицы для сборки скоринговой выборки */
+	data nac.gc_aggr_smart;
+		set public.gc_aggr_smart;
+	run;
+
+	data nac.gc_aggr_dump;
+		set public.gc_aggr_dump;
+	run;
+
 	/* Добавляем к витрине характеристики трафика ресторана */
 	proc fedsql sessref=casauto;
 		create table public.na_abt7{options replace=true} as
@@ -1077,7 +1079,7 @@ run;
 
 	/* Создаем временные ряды продаж мастеркодов */
 	proc sql;
-		create table work.pmix_mastercode_sum as
+		create table nac.pmix_mastercode_sum as
 			select
 				t1.pbo_location_id,
 				t1.PROD_LVL4_ID,
@@ -1100,7 +1102,7 @@ run;
 
 				) as t1
 				inner join
-					work.product_dictionary_ml as t2
+					nac.product_dictionary_ml as t2
 				on
 					t1.product_id = t2.product_id
 				where
@@ -1115,7 +1117,7 @@ run;
 
 	/* Выгружаем таблицу в cas */
 	data public.pmix_mastercode_sum;
-		set work.pmix_mastercode_sum;
+		set nac.pmix_mastercode_sum;
 	run;
 	
 	/* Снова создадим таблицу с промо акциями */

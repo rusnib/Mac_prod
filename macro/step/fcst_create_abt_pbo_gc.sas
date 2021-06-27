@@ -123,10 +123,6 @@
 	;
 	QUIT;
 
-	/* 6. */
-	%let start_date='01oct2020'd;
-	%let end_date='31jan2021'd;
-	
 	data casuser.dates;
 		do SALES_DT=&start_date. to &end_date.;
 		new_RECEIPT_QTY = .;
@@ -792,12 +788,12 @@
 	QUIT;
 	
 	DATA casuser.PBO_SM_TRAIN_TRP(replace=yes);
-		set casuser.PBO_SM_TRAIN_TRP;
+		set casuser.PBO_SM_TRAIN_TRP(where=(sales_dt>=intnx('year', sales_dt, -4, 'B')));
 		format sales_dt date9.;
 	RUN;
 	
 	DATA casuser.GC_TRAIN_ABT_TRP(replace=yes);
-		set casuser.GC_TRAIN_ABT_TRP;
+		set casuser.GC_TRAIN_ABT_TRP(where=(sales_dt>=intnx('year', sales_dt, -4, 'B')));
 		format sales_dt date9.;
 	RUN;
 	

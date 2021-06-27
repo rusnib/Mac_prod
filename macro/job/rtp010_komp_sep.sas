@@ -47,6 +47,11 @@
 	%tech_update_resource_status(mpStatus=L, mpResource=rtp_out_integration);
 	%tech_open_resource(mpResource=rtp_komp_sep);
 	
+	/* OPEN DP_INTEGRATION RESOURCES */
+	%tech_open_resource(mpResource=LOAD_COMP_GC_MONTH_FORC);
+	%tech_open_resource(mpResource=LOAD_COMP_SALE_MONTH_FORC);
+	%tech_open_resource(mpResource=LOAD_COMP_UPT_MONTH_FORC);
+	
 	%tech_log_event(mpMode=END, mpProcess_Nm=rtp_komp_sep);	
 	
 %mend rtp010_komp_sep;

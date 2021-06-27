@@ -11,8 +11,8 @@
 /* LIBNAME ETL_STG "/data2/etl_stg_23_11_2020"; */
 /* %let inlib=ETL_STG; */
 
-%let forecast_start_dt = date '2021-05-11';
-%let forecast_end_dt = date '2021-08-10';
+%let forecast_start_dt = date '2021-05-19';
+%let forecast_end_dt = date '2021-08-19';
 
 
 %let project_id =3d54d821-4c3f-41cb-9232-75bc920f8f48;
@@ -20,7 +20,7 @@
 
 /* 1. Get forecast horizon from project */
 PROC FEDSQL sessref=casauto;
-   CREATE TABLE PUBLIC.HORIZON_SM{options replace=true} AS 
+   CREATE TABLE casuser.HORIZON_SM{options replace=true} AS 
    SELECT 
         t1.CHANNEL_CD,
 		t1.PBO_LOCATION_ID,
@@ -31,7 +31,7 @@ PROC FEDSQL sessref=casauto;
 QUIT;
 /*  */
 
-proc casutil incaslib='Public';
+proc casutil incaslib='casuser';
 	droptable casdata='gc_forecast_holdout' quiet;
 run;
 
@@ -54,8 +54,8 @@ PROC FEDSQL sessref=casauto;
             (t3.PREDICT_SM * t1.Detrend_sm_multi) AS Forecast_daily_sm7, 
 /*           Forecast_daily_week */
             (t3.PREDICT_SM * t1.Detrend_multi) AS Forecast_daily_week
-      FROM /*PUBLIC.GC_TRAIN_ABT*/ PUBLIC.NIK_T2 t1
-           LEFT JOIN PUBLIC.HORIZON_SM t3 ON (t1.CHANNEL_CD = t3.CHANNEL_CD) AND 
+      FROM /*PUBLIC.GC_TRAIN_ABT*/ CASUSER.GC_TRAIN_ABT_TRP t1
+           LEFT JOIN casuser.HORIZON_SM t3 ON (t1.CHANNEL_CD = t3.CHANNEL_CD) AND 
           (t1.PBO_LOCATION_ID = t3.PBO_LOCATION_ID) AND (t1.SALES_DT = t3.SALES_DT)
    	  WHERE t1.SALES_DT between &forecast_start_dt. and &forecast_end_dt.
 ;
@@ -64,5 +64,5 @@ QUIT;
 
 
 proc casutil;
-	promote casdata='forecast_restored' incaslib='casuser' outcaslib='casuser' casout='gc_forecast_holdout12';
+	promote casdata='forecast_restored' incaslib='casuser' outcaslib='max_casl' casout='gc_forecast_may19_ho12';
 run;

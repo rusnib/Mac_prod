@@ -34,7 +34,7 @@
 	%tech_log_event(mpMode=START, mpProcess_Nm=rtp_7_out_integration);				
 	%tech_update_resource_status(mpStatus=P, mpResource=rtp_score_pmix);
 	/* Получение токена аутентификации */
-	%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+	%tech_get_token(mpUsername=&SYS_ADM_USER., mpOutToken=tmp_token);
 		%rtp_7_out_integration(mpVfPmixProjName=&VF_PMIX_PROJ_NM.,
 									mpVfPboProjName=&VF_PBO_PROJ_NM.,
 									mpMLPmixTabName=mn_short.pmix_days_result,

@@ -33,7 +33,7 @@
 									where exec_dttm = select max(exec_dttm) as max 
 														from etl_cfg.cfg_resource_registry 
 														where resource_id = &lmvResId.
-														and status_cd in ('H'/*, 'E'*/)  
+													/*	and status_cd in ('H', 'E')  */
 	;													
 	quit;
 	

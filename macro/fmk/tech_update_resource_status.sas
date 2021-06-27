@@ -25,9 +25,7 @@
 		SET
 			STATUS_CD="&lmvStatus."
 		WHERE
-				/*(UPCASE(STRIP(RESOURCE_NM))=STRIP("&lmvResource.") AND BATCH_CYCLE_ID=(select max(batch_id) from etl_cfg.cfg_batch_etl_cycle)) 
-				or*/
-				(UPCASE(STRIP(RESOURCE_NM))=STRIP("&lmvResource.") and BATCH_CYCLE_ID = . AND UPCASE(STRIP(STATUS_CD)) ^="C")
+				(UPCASE(STRIP(RESOURCE_NM))=STRIP("&lmvResource.") AND UPCASE(STRIP(STATUS_CD)) ^="C")
 		;
 	QUIT;
 	

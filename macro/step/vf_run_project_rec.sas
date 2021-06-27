@@ -32,7 +32,7 @@
 	%local lmvAPI_URL lmvVfPboName lmvProjectId;
 	%let lmvAPI_URL = &CUR_API_URL.;
 	/* Получение токена аутентификации */
-	%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+	%tech_get_token(mpUsername=&SYS_ADM_USER., mpOutToken=tmp_token);
 	/* Получение списка VF-проектов */
 	filename resp TEMP;
 	proc http

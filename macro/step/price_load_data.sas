@@ -13,6 +13,8 @@
         caslib _all_ assign;
     %end;
     
+	%tech_clean_lib(mpCaslibNm=casuser);
+	
      proc casutil;
         droptable casdata="promo" incaslib="casuser" quiet;
         droptable casdata="promo_pbo" incaslib="casuser" quiet;

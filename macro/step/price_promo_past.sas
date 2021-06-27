@@ -785,6 +785,16 @@
             call symputx('lmvPboUsedNum',n);
             stop;
         run;
+		
+		%if &SYSCC gt 4 %then %do;
+			/* Return session in execution mode */
+			OPTIONS NOSYNTAXCHECK OBS=MAX;
+			/* Закрываем процесс в etl_cfg.cfg_status_table и обновляем ресурс*/
+			%tech_update_resource_status(mpStatus=E, mpResource=price_regular_future);
+			%tech_log_event(mpMODE=END, mpPROCESS_NM=price_promo_past);
+			
+			%abort;
+		%end;
 
     %end;
 

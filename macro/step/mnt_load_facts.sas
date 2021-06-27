@@ -11,13 +11,4 @@
 						mpPath = /data/files/output/dp_files/
 						);
 	%tech_redirect_log(mpMode=END, mpJobName=dp_load_facts, mpArea=Main);
-	
-	/*
-	%dp_jobexecution(mpJobName=ACT_LOAD_UPT_FaM_KOMP);
-	%dp_jobexecution(mpJobName=ACT_LOAD_GC_FaM_KOMP);
-	%dp_jobexecution(mpJobName=ACT_LOAD_QNT_FaM_KOMP);
-	%dp_jobexecution(mpJobName=ACT_LOAD_UPT_FaM_NONKOMP);
-	%dp_jobexecution(mpJobName=ACT_LOAD_GC_FaM_NONKOMP);
-	%dp_jobexecution(mpJobName=ACT_LOAD_QNT_FaM_NONKOMP);
-	*/
 %mend mnt_load_facts;

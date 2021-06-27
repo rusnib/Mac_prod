@@ -7,7 +7,11 @@
 			caslib _all_ assign;
 	%end;
 	
-	%local lmvPtCaslib lmvOutCaslib lmvReportDttm lmvInLib;
+	%local lmvPtCaslib
+			lmvOutCaslib
+			lmvReportDttm 
+			lmvInLib
+			;
 
 	%let lmvReportDttm=&ETL_CURRENT_DTTM.;
 	%let lmvPtCaslib=&mpPtCaslib.;
@@ -20,39 +24,38 @@
 		droptable casdata='promo_pbo_enh' incaslib="&lmvOutCaslib." quiet;
 		droptable casdata='promo_enh' incaslib="&lmvOutCaslib." quiet;
 		droptable casdata='product_chain_enh' incaslib="&lmvOutCaslib." quiet;
-	  droptable casdata="pt_promo_x_dim_point" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_promo_detail" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_promo_calendar" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_promo" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_dim_point" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_internal_org" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_internal_org_hierarchy" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_product" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_product_hierarchy" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_segment" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_segment_hierarchy" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_channel" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="pt_channel_hierarchy" incaslib="&lmvOutCaslib" quiet;
-	  droptable casdata="promo_calculation" incaslib="&lmvOutCaslib" quiet;
-	  load data=&lmvPtCaslib..promo_x_dim_point casout='pt_promo_x_dim_point' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..promo_detail casout='pt_promo_detail' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..promo_calendar casout='pt_promo_calendar' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..promo casout='pt_promo' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..dim_point casout='pt_dim_point' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..internal_org casout='pt_internal_org' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..internal_org_hierarchy casout='pt_internal_org_hierarchy' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..product casout='pt_product' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..product_hierarchy casout='pt_product_hierarchy' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..segment casout='pt_segment' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..segment_hierarchy casout='pt_segment_hierarchy' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..channel casout='pt_channel' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..channel_hierarchy casout='pt_channel_hierarchy' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvInLib..channel_lookup casout='pt_channel_lookup' outcaslib="&lmvOutCaslib" replace;
-	  load data=&lmvPtCaslib..promo_calculation casout='promo_calculation' outcaslib="&lmvOutCaslib" replace;
+		droptable casdata="pt_promo_x_dim_point" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_promo_detail" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_promo_calendar" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_promo" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_dim_point" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_internal_org" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_internal_org_hierarchy" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_product" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_product_hierarchy" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_segment" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_segment_hierarchy" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_channel" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="pt_channel_hierarchy" incaslib="&lmvOutCaslib" quiet;
+		droptable casdata="promo_calculation" incaslib="&lmvOutCaslib" quiet;
+		load data=&lmvPtCaslib..promo_x_dim_point casout='pt_promo_x_dim_point' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..promo_detail casout='pt_promo_detail' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..promo_calendar casout='pt_promo_calendar' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..promo casout='pt_promo' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..dim_point casout='pt_dim_point' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..internal_org casout='pt_internal_org' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..internal_org_hierarchy casout='pt_internal_org_hierarchy' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..product casout='pt_product' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..product_hierarchy casout='pt_product_hierarchy' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..segment casout='pt_segment' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..segment_hierarchy casout='pt_segment_hierarchy' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..channel casout='pt_channel' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..channel_hierarchy casout='pt_channel_hierarchy' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvInLib..channel_lookup casout='pt_channel_lookup' outcaslib="&lmvOutCaslib" replace;
+		load data=&lmvPtCaslib..promo_calculation casout='promo_calculation' outcaslib="&lmvOutCaslib" replace;
 	quit;
 
-
-/*==============================*/
+	/*==============================*/
 	%let mvPCalRk = ;
 	%if %length(&PromoCalculationRk)>0 %then %do;
 	proc fedsql sessref=casauto; /*get p_cal_rk*/
@@ -66,16 +69,16 @@
 	quit;
 	%put &mvPCalRk;
 	  %if %length(&mvPCalRk)>0 %then %do;
-	  proc fedsql sessref=casauto;
-		create table &lmvOutCaslib..pt_promo1{options replace=true} as
-			select 
-			promo_rk,p_cal_rk,trim(promo_id) as promo_id,promo_nm,
-			datepart(promo_start_dttm) as start_dt,
-			datepart(promo_end_dttm) as end_dt
-		from &lmvOutCaslib..PT_PROMO
-		where upcase(trim(promo_status_cd))='APPROVED'
-			or (p_cal_rk=&mvPCalRk and upcase(trim(promo_status_cd))='DRAFT');
-	  quit;
+		  proc fedsql sessref=casauto;
+			create table &lmvOutCaslib..pt_promo1{options replace=true} as
+				select 
+				promo_rk,p_cal_rk,trim(promo_id) as promo_id,promo_nm,
+				datepart(promo_start_dttm) as start_dt,
+				datepart(promo_end_dttm) as end_dt
+			from &lmvOutCaslib..PT_PROMO
+			where upcase(trim(promo_status_cd))='APPROVED'
+				or (p_cal_rk=&mvPCalRk and upcase(trim(promo_status_cd))='DRAFT');
+		  quit;
       %end;
 	%end;
 	%if %length(&PromoCalculationRk)=0 or %length(&mvPCalRk)=0 %then %do;
@@ -102,7 +105,7 @@
 	
 	/* Загрузка Промо */
 	data &lmvOutCaslib..promo (replace=yes  drop=valid_from_dttm valid_to_dttm);
-		set &lmvInLib..promo(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		set &lmvInLib..promo(where=(valid_to_dttm>=&lmvReportDttm.));
 	run;
 	
 	/* создать числовые promo_id для promo_id вида 78b61716-af8e-4deb-97e2-1f79e74c7118 */
@@ -115,19 +118,41 @@
 		where t1.promo_id is null
 		;
 	quit;
+	
 	proc fedsql sessref=casauto;
 		create table &lmvOutCaslib..max_promo_id{options replace=true} as
 		select max(promo_id) as max_promo_id from
 		&lmvOutCaslib..promo;
 	quit;
+	
+	/* START: Блок для сортировки полученных после интеграции с ПТ промо акций для обеспечения воспроизводимости результата */
+	proc sql noprint;
+		create table work.promo_id_exp_sorted as
+		select * from &lmvOutCaslib..promo_id_exp
+		order by promo_id asc
+		;
+	quit;
 
+	data work.promo_id_map;
+		if _n_ = 1 then set &lmvOutCaslib..max_promo_id;
+		keep promo_id_num promo_id;
+		set work.promo_id_exp_sorted;
+		promo_id_num=max_promo_id+9999+_n_;
+	run;
+
+	data casuser.promo_id_map;
+		set  work.promo_id_map;
+	run;
+	/* END: Блок для сортировки полученных после интеграции с ПТ промо акций для обеспечения воспроизводимости результата */
+	
+	/*
 	data &lmvOutCaslib..promo_id_map /sessref="casauto" single=yes;;
 		if _n_ = 1 then set &lmvOutCaslib..max_promo_id;
 		keep promo_id_num promo_id;
 		set &lmvOutCaslib..promo_id_exp;
 		promo_id_num=max_promo_id+9999+_n_;
 	run;
-
+	*/
 	/*таблица в разрезе промо-акций*/
 	proc fedsql sessref=casauto;
 		create table &lmvOutCaslib..pt_promo2{options replace=true} as
@@ -183,7 +208,7 @@
 	quit;
 	
 	data &lmvOutCaslib..media (replace=yes rename=(report_dt=period_dt) drop=valid_from_dttm valid_to_dttm);
-		set &lmvInLib..media(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		set &lmvInLib..media(where=(valid_to_dttm>=&lmvReportDttm.));
 	run;
 	
 	/*нужны отдельные ID для promo_group_id, через которую идёт мэппинг с media*/
@@ -314,11 +339,11 @@
 	quit;
 	
 	data &lmvOutCaslib..promo_pbo (replace=yes drop=valid_from_dttm valid_to_dttm);
-		set &lmvInLib..promo_x_pbo(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		set &lmvInLib..promo_x_pbo(where=(valid_to_dttm>=&lmvReportDttm.));
 	run;
 	
 	data &lmvOutCaslib..promo_prod (replace=yes drop=valid_from_dttm valid_to_dttm);
-		set &lmvInLib..promo_x_product(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		set &lmvInLib..promo_x_product(where=(valid_to_dttm>=&lmvReportDttm.));
 	run;
 	
 	/*мэппинг casuser.PROMO_PBO*/
@@ -365,7 +390,7 @@
 	/*pbo_location_id - to leaf level!*/
 	
 	data CASUSER.PBO_LOC_HIERARCHY (replace=yes drop=valid_from_dttm valid_to_dttm);
-		set &lmvInLib..PBO_LOC_HIERARCHY(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+		set &lmvInLib..PBO_LOC_HIERARCHY(where=(valid_to_dttm>=&lmvReportDttm.));
 	run;
 
 	proc fedsql sessref=casauto noprint;
@@ -418,7 +443,7 @@
 
 	proc fedsql sessref=casauto;
 		create table &lmvOutCaslib..product_chain_add1{options replace=true} as
-		select 
+		select distinct
 		t1.start_dt as predecessor_end_dt,
 		t2.pbo_location_id as predecessor_dim2_id,
 		t3.product_id as predecessor_product_id
@@ -428,9 +453,14 @@
 		where t1.mechanicstype ='Delisting';
 	quit;
 
+	/* Временная подмена таблицы product_chain */
+	%load_product_chain(mpOutput = mn_short.product_chain);
+	
 	data &lmvOutCaslib..product_chain1;
-		set &lmvInLib..PRODUCT_CHAIN;
-		where valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.; /*применяем усл для версионирования*/
+		/* Временная подмена таблицы product_chain */
+		/* set &lmvInLib..PRODUCT_CHAIN; */
+		set mn_short.product_chain;
+		/* where valid_to_dttm>=&lmvReportDttm.; применяем усл для версионирования*/
 	run;
 
 	data &lmvOutCaslib..product_chain_add2;
@@ -442,7 +472,7 @@
 	/*list of promo products*/
 	data &lmvOutCaslib..product_attr1;
 		set &lmvInLib..PRODUCT_ATTRIBUTES;
-		where valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.; /*применяем усл для версионирования*/
+		where valid_to_dttm>=&lmvReportDttm.; /*применяем усл для версионирования*/
 	run;
 
 	proc fedsql sessref=casauto;
@@ -485,7 +515,7 @@
 
 	proc fedsql sessref=casauto;
 		create table &lmvOutCaslib..promo_prod_intersect3{options replace=true} as
-		select t2.product_id as successor_product_id,
+		select distinct t2.product_id as successor_product_id,
 				t4.pbo_location_id as successor_dim2_id, 
 				t3.start_dt as successor_start_dt, 
 				t3.end_dt as predecessor_end_dt
@@ -515,15 +545,6 @@
 	run;
 
 	proc casutil;
-		/*
-		%if &lmvOutCaslib. ne casuser %then %do;
-			promote casdata='media_enh' incaslib="&lmvOutCaslib." outcaslib="&lmvOutCaslib.";
-			promote casdata='promo_prod_enh' incaslib="&lmvOutCaslib." outcaslib="&lmvOutCaslib.";
-			promote casdata='promo_pbo_enh' incaslib="&lmvOutCaslib." outcaslib="&lmvOutCaslib.";
-			promote casdata='promo_enh' incaslib="&lmvOutCaslib." outcaslib="&lmvOutCaslib.";
-			promote casdata='product_chain_enh' incaslib="&lmvOutCaslib." outcaslib="&lmvOutCaslib.";
-		%end;
-		*/
 		droptable casdata='product_attr1' incaslib="&lmvOutCaslib." quiet;
 		droptable casdata='promo_prod_list' incaslib="&lmvOutCaslib." quiet;
 		droptable casdata='promo_prod_intersect' incaslib="&lmvOutCaslib." quiet;

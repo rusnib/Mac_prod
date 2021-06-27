@@ -22,6 +22,7 @@
 %global ETL_SCD_FUTURE_DTTM;        /* Дата, которой закрываются текущие версии записей SCD */
 %global ETL_SCD_FUTURE_DTTM_DB;		/* Дата, которой закрываются текущие версии записей SCD в формате DB*/
 %global ETL_CURRENT_DT;             /* Текущая дата для ETL-процессов */
+%global ETL_RETRIES_COUNT;		  /* Кол-во перезапусков для упавших процессов */
 %global ETL_CURRENT_DTTM;           /* Текущее дата-время для ETL-процессов */
 %global ETL_CURRENT_DTTM_DB;		/* Текущее дата-время для ETL-процессов в формате DB*/
 
@@ -66,7 +67,7 @@
 %global VF_PBO_PROJ_NM;				/* Наименование VF-проекта, построенного на pbo_sal_abt*/
 %global VF_GC_NM;					/* Наименование VF-проекта для прогнозирования GC*/
 %global VF_PBO_NM;					/* Наименование VF-проекта для прогнозирования PBO*/
-
+%global SYS_ADM_USER;				/* Имя пользователя, от имени которого запускаются регламентные процессы системы */
 
 %global RTP_TRAIN_FLG_PMIX;			/* Флаг запуска обучения моделей PMIX (Y/N)*/
 %global RTP_TRAIN_FLG_MC;			/* Флаг запуска обучения моделей MC (Y/N)*/
@@ -91,6 +92,7 @@
 %let ETL_SCD_FUTURE_DTTM            =  %sysfunc(putn('01Jan5999 00:00:00'dt, best.));
 %let ETL_SCD_FUTURE_DTTM_DB			=  %str(date%')01Jan5999 00:00:00%str(%');
 %let ETL_CURRENT_DT                 =  %sysfunc(date());
+%let ETL_RETRIES_COUNT              =  3;
 %let ETL_CURRENT_DTTM               =  %sysfunc(datetime());
 %let ETL_CURRENT_DTTM_DB			=  %str(%')%sysfunc(putn(%sysfunc(datepart(%sysfunc(datetime()))),yymmdd10.))%str( )%sysfunc(putn(%sysfunc(timepart(%sysfunc(datetime()))), time.))%str(%');
 
@@ -121,13 +123,14 @@
 %let VF_PBO_PROJ_NM					= nm_abt_pbo;
 %let VF_GC_NM						= mn_gc_shortterm;
 %let VF_PBO_NM						= mn_pbo_shortterm;
+%let SYS_ADM_USER					= ru-nborzunov;
 
 %let RTP_TRAIN_FLG_PMIX				= N;
 %let RTP_TRAIN_FLG_MC				= N;
 %let RTP_PROMO_MECH_TRANSF_FILE		= /data/files/input/PROMO_MECH_TRANSFORMATION.csv;
 %let SAS_START_CMD                  =  &ETL_ROOT/config/start_sas.cmd;
 %let VF_START_DATE					= %sysfunc(intnx(month,&VF_HIST_START_DT_SAS.,10,b));
-%let RTP_START_DATE					= %eval(%sysfunc(intnx(year,&etl_current_dt.,-2,s))-91); 
+%let RTP_START_DATE					= %sysfunc(intnx(year,&etl_current_dt.,-4,s)); 
 /*===================================== GLOBAL ===================================*/
 /* Здесь исполняются глобальные назначения                                        */
 /*================================================================================*/
@@ -184,10 +187,12 @@ libname etl_stg postgres &ETL_STG_CONNECT_OPTIONS schema=etl_stg;
 
 libname etl_cfg postgres &ETL_CFG_CONNECT_OPTIONS schema=etl_cfg;
 
-libname pt postgres server="10.252.151.3" port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192"; 
+/* libname pt postgres server="10.252.151.3" port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192"; */
 
+libname pt postgres server="&CUR_API_URL." port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192"; 
 libname pt_prod postgres server="&CUR_API_URL." port=5452 user=pt password="{SAS002}1D57933958C580064BD3DCA81A33DFB2" database=pt defer=yes schema=public readbuff=32767 conopts="UseServerSidePrepare=1;UseDeclareFetch=1;Fetch=8192";
 
 LIBNAME ia ORACLE &IA_CONNECT_OPTIONS SCHEMA=&IA_CONNECT_SCHEMA.;
 
 libname ETL_TMP "/data/ETL_TMP";
+libname MN_CALC "/data/MN_CALC";

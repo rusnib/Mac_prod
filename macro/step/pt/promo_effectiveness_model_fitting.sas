@@ -7,13 +7,15 @@
 	 maxbranch=2 
      assignmissing=useinsearch 
 	 minuseinsearch=5
-     ntrees=100
+     ntrees=1 /*100*/
      maxdepth=20
      inbagfraction=0.7
      minleafsize=5
      numbin=100
      printtarget
 ;
+
+
 
 %macro promo_effectiveness_model_fit(
 	data = public.na_train,
@@ -99,8 +101,8 @@
 			STD_SALES_QTY
 				/ level = interval;
 		input 
-			LVL3_ID
-			LVL2_ID
+/* 			LVL3_ID */
+/* 			LVL2_ID */
 			AGREEMENT_TYPE_ID
 			BREAKFAST_ID
 			BUILDING_TYPE_ID
@@ -116,5 +118,13 @@
 		savestate rstore=public.&output.;
 		;
 	run;
+
+	proc casutil;
+	    promote casdata="&output." incaslib="public" outcaslib="public";
+	run;
+
+    proc astore;
+        download RSTORE=public.&output. store="/data/ETL_BKP/&output.";
+    run;
 
 %mend;

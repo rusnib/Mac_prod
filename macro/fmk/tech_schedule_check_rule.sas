@@ -76,7 +76,6 @@
 						SELECT 1 AS NOT_AVAILABLE_FLAG INTO :mvNOT_AV_FLAG
 						FROM etl_cfg.cfg_status_table
 						where (resource_nm in (&mvRESOURCE_GEN.) AND status_cd = 'P' )
-							/* AND batch_cycle_id = &GL_MAX_BATCH_ETL_CYCLE. */
 						;
 						
 					QUIT;

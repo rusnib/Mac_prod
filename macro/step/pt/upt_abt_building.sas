@@ -3,35 +3,6 @@
 	 раскладывающей UPT на эффекты от промо
 */
 
-/* 
-	Загрузка промо таблиц из ингерационного слоя
-	В дальнейшем эти таблицы будут заменены на таблицы
-	из промо тула.
-*/
-proc casutil;
-	load data=etl_ia.promo(
-			where=(
-				&ETL_CURRENT_DTTM. <= valid_to_dttm and
-				&ETL_CURRENT_DTTM. >= valid_from_dttm
-			)
-		) casout='ia_promo' outcaslib='public' replace;
-
-	load data=etl_ia.promo_x_pbo(
-			where=(
-				&ETL_CURRENT_DTTM. <= valid_to_dttm and
-				&ETL_CURRENT_DTTM. >= valid_from_dttm
-			)
-		) casout='ia_promo_x_pbo' outcaslib='public' replace;	
-
-	load data=etl_ia.promo_x_product(
-			where=(
-				&ETL_CURRENT_DTTM. <= valid_to_dttm and
-				&ETL_CURRENT_DTTM. >= valid_from_dttm
-			)
-		) casout='ia_promo_x_product' outcaslib='public' replace;
-run;
-
-
 %macro upt_abt_building(
 	promo_lib = public, 
 	ia_promo = ia_promo,
@@ -60,7 +31,7 @@ run;
 	
 	/* Агрегируем pmix */
 	proc sql;
-		create table work.aggr_pmix as
+		create table nac.aggr_pmix as
 			select
 				t1.product_id,
 				t1.sales_dt,
@@ -119,7 +90,7 @@ run;
 				t1.sales_dt,
 				divide(t1.sum_qty, t2.receipt_qty)*1000 as upt
 			from 
-				work.aggr_pmix as t1
+				nac.aggr_pmix as t1
 			left join
 				work.aggr_gc as t2
 			on
@@ -858,30 +829,26 @@ run;
 				t1.sales_dt,
 				(t1.sales_dt - t3.ts_start + 1) as t,
 				t1.upt,
-				divide(t1.positive_promo_na, t2.receipt_qty) as positive_promo_na,
-				divide(t1.mastercode_promo_na, t2.receipt_qty) as mastercode_promo_na,
-				divide(t1.Undefined_Product_Group, t2.receipt_qty) as Undefined_Product_Group,
-				divide(t1.Cold_Drinks, t2.receipt_qty) as Cold_Drinks,
-				divide(t1.Hot_Drinks, t2.receipt_qty) as Hot_Drinks,
-				divide(t1.Breakfast, t2.receipt_qty) as Breakfast,
-				divide(t1.Condiments, t2.receipt_qty) as Condiments,
-				divide(t1.Desserts, t2.receipt_qty) as Desserts,
-				divide(t1.Fries, t2.receipt_qty) as Fries,
-				divide(t1.Starters___Salad, t2.receipt_qty) as Starters___Salad,
-				divide(t1.SN_CORE, t2.receipt_qty) as SN_CORE,
-				divide(t1.McCafe, t2.receipt_qty) as McCafe,
-				divide(t1.Non_product, t2.receipt_qty) as Non_product,
-				divide(t1.SN_EDAP, t2.receipt_qty) as SN_EDAP,
-				divide(t1.SN_PREMIUM, t2.receipt_qty) as SN_PREMIUM,
-				divide(t1.Value_Meal, t2.receipt_qty) as Value_Meal,
-				divide(t1.Nuggets, t2.receipt_qty) as Nuggets,
-				divide(t1.Shakes, t2.receipt_qty) as Shakes
+				t1.positive_promo_na,
+				t1.mastercode_promo_na,
+				t1.Undefined_Product_Group,
+				t1.Cold_Drinks,
+				t1.Hot_Drinks,
+				t1.Breakfast,
+				t1.Condiments,
+				t1.Desserts,
+				t1.Fries,
+				t1.Starters___Salad,
+				t1.SN_CORE,
+				t1.McCafe,
+				t1.Non_product,
+				t1.SN_EDAP,
+				t1.SN_PREMIUM,
+				t1.Value_Meal,
+				t1.Nuggets,
+				t1.Shakes
 			from
 				work.upt_promo_effect_abt as t1
-			left join
-				work.aggr_gc as t2
-			on
-				t1.sales_dt = t2.sales_dt
 			inner join
 				work.time_series_start as t3
 			on
@@ -899,7 +866,6 @@ run;
 		delete mastercode_promo;
 		delete same_mastercode_products;
 
-		delete aggr_pmix;
 		delete aggr_gc;
 		delete option_freq;
 		delete option_mean;

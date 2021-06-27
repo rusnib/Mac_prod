@@ -778,6 +778,16 @@
             proc casutil;droptable casdata="REG_INTERVALS_OUT" incaslib="CASUSER" quiet;run;
             proc casutil;droptable casdata="REG_INTERVALS_OUT_1" incaslib="CASUSER" quiet;run;
             proc casutil;droptable casdata="REG_INTERVALS_OUT_2" incaslib="CASUSER" quiet;run;
+			
+			%if &SYSCC gt 4 %then %do;
+				/* Return session in execution mode */
+				OPTIONS NOSYNTAXCHECK OBS=MAX;
+				/* Закрываем процесс в etl_cfg.cfg_status_table и обновляем ресурс*/
+				%tech_update_resource_status(mpStatus=E, mpResource=price_load_data);
+				%tech_log_event(mpMODE=END, mpPROCESS_NM=price_regular_past);
+				
+				%abort;
+			%end;
         %end;
 
         %let lmvIterCounter = %eval(&lmvIterCounter. + 1);

@@ -65,7 +65,7 @@
 	
 	%if &mpAuth. = YES %then %do;
 	/* Получение токена аутентификации */
-		%tech_get_token(mpUsername=ru-nborzunov, mpOutToken=tmp_token);
+		%tech_get_token(mpUsername=&SYS_ADM_USER., mpOutToken=tmp_token);
 		
 		filename resp TEMP;
 		/* Получение списка VF-проектов */

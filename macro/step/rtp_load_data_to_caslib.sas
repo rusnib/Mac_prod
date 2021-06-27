@@ -681,6 +681,8 @@
 		set &lmvWorkCaslib..media_enh;
 	run;
 
+	/* Changes begin: Maxim Povod, 20.05.2021 */
+	/*
 	proc fedsql sessref=casauto;
 		create table casuser.promo_ml_trp{options replace = true} as 
 			select
@@ -764,25 +766,88 @@
 			REPORT_DT + 1;
 		end;
 	run;
+	*/
+	
+	/* Разворачиваем медиаподдержку до уровня Товар-ПБО-интервал действия */
+	proc fedsql sessref=casauto;
+		create table casuser.promo_ml_trp{options replace = true} as 
+		select distinct
+			t3.product_LEAF_ID,
+			t2.PBO_LEAF_ID,
+			datepart(t1.START_DT) as start_dt,
+			datepart(t1.END_DT) as end_dt,
+			coalesce(t4.TRP, 0) as trp
+		from
+			casuser.promo /* promo_enh */ as t1   
+		left join
+			casuser.promo_x_pbo_leaf as t2
+		on 
+			t1.PROMO_ID = t2.PROMO_ID
+		left join
+			casuser.promo_x_product_leaf as t3
+		on
+			t1.PROMO_ID = t3.PROMO_ID
+		left join
+			casuser.media /* media_enh */ as t4
+		on
+			t1.PROMO_GROUP_ID = t4.PROMO_GROUP_ID and
+			datepart(t4.report_dt) <= datepart(t1.end_dt) and
+			datepart(t4.report_dt) >= datepart(t1.start_dt)
+		;
+	quit;
+	
+	/* Усредняем TRP в рамках одного интервала промо */
+	proc fedsql sessref=casauto;
+		create table casuser.promo_ml_trp2{options replace=true} as
+			select
+				product_LEAF_ID,
+				PBO_LEAF_ID,
+				start_dt,
+				end_dt,
+				/*mean(TRP) as mean_trp*/
+				mean(TRP) as trp
+			from
+				casuser.promo_ml_trp as t1
+			
+			where product_LEAF_ID is not null 
+				and PBO_LEAF_ID is not null 
 
+			group by
+				product_LEAF_ID,
+				PBO_LEAF_ID,
+				start_dt,
+				end_dt			
+		;
+	quit;
+	
+	/* Раскладываем до уровня Товар-ПБО-день */
+	data casuser.promo_ml_trp_expand;
+		set casuser.promo_ml_trp2;
+		do sales_dt = start_dt to end_dt;
+			output;
+		end;
+	run;
+	
 	proc fedsql sessref=casauto;
 		create table casuser.sum_trp{options replace=true} as 
 			select
 				t1.PRODUCT_LEAF_ID,
 				t1.PBO_LEAF_ID,
-				t1.REPORT_DT,
+				cast(t1.sales_dt as date) as REPORT_DT,
 				sum(t1.trp) as sum_trp
 			from
 				casuser.promo_ml_trp_expand as t1
 			group by
 				t1.PRODUCT_LEAF_ID,
 				t1.PBO_LEAF_ID,
-				t1.report_dt
+				t1.sales_dt
 		;
 	quit;
+	
+	/* Changes end: Maxim Povod, 20.05.2021 */
 
 	proc casutil;
-		promote casdata="num_of_promo_prod" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
+		*promote casdata="num_of_promo_prod" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		promote casdata="promo" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		promote casdata="promo_x_pbo_leaf" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
 		promote casdata="promo_x_product_leaf" incaslib="casuser" outcaslib="&lmvWorkCaslib.";
@@ -1132,10 +1197,11 @@
 	run;
 	
 	/* part for vf_new_product*/
+	/*
 	data CASUSER.product_chain (replace=yes drop=valid_from_dttm valid_to_dttm);
 		set &lmvInLib..product_chain(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
 	run;
-
+	*/
 	proc fedsql sessref=casauto noprint;
 		create table casuser.product_chain{options replace=true} as
 		  select 
@@ -1147,7 +1213,7 @@
 			,SUCCESSOR_PRODUCT_ID
 			,PREDECESSOR_END_DT
 			,SUCCESSOR_START_DT
-		  from casuser.product_chain_enh
+		  from &lmvWorkCaslib..product_chain_enh
 		;
 	quit;
 

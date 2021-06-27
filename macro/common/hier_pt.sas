@@ -37,7 +37,7 @@
 	%let mvTbl = %sysfunc(scan(&mpIn.,2,"."));
 	%if %sysfunc(upcase(&mvLib.)) = ETL_IA %then %do;
 		data etl_ia_&mvTbl.;
-			set &mpIn.(where=(valid_from_dttm<=&lmvReportDttm. and valid_to_dttm>=&lmvReportDttm.));
+			set &mpIn.(where=(valid_to_dttm>=&ETL_CURRENT_DTTM.));
 		run;
 	%end;
 	/*

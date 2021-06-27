@@ -29,7 +29,7 @@
 ****************************************************************************/
 %macro load_pt;
 	/* bkp pt dir */
-	%bkp_pt;
+	*%bkp_pt;
 	
 	%local mvDatetime 
 			lmvReportDttm

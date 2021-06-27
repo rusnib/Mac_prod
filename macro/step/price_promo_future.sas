@@ -38,10 +38,12 @@
     , mpProductAttrTable    = CASUSER.PRODUCT_ATTRIBUTES
     , mpPriceIncreaseTable 	= CASUSER.PRICE_INCREASE
     , mpOutTable	  	 	= CASUSER.PRICE_PROMO_FUTURE
+	, mpPromoClRk			= 
     );
 *
 ****************************************************************************
-*  ..-..-2021 		Мугтасимов Данил 		Начальное кодирование
+*  30-04-2021 		Мугтасимов Данил 		Начальное кодирование
+*  25-06-2021		Borzunov Nikita			Additional param mpPromoClRk for Promo Tool View process (default value = NULL)
 ****************************************************************************/
 %macro price_promo_future(
     mpPromoTable         	= CASUSER.PROMO_ENH
@@ -54,6 +56,7 @@
     , mpProductAttrTable    = CASUSER.PRODUCT_ATTRIBUTES
     , mpPriceIncreaseTable 	= CASUSER.PRICE_INCREASE
     , mpOutTable	  	 	= DM_ABT.PRICE_PROMO_FUTURE
+	, mpPromoClRk			= 
     );
 
     %local 
@@ -88,6 +91,19 @@
         caslib _all_ assign;
     %end;
     
+	%if %length(&mpPromoClRk.) > 0 %then %do;
+		%add_promotool_marks2(
+			mpOutCaslib=casuser,
+			mpPtCaslib=pt,
+			PromoCalculationRk=&mpPromoClRk.
+		);
+		/*reinitialize macrovars for Promo Tool View calculation */
+		%let mpPromoTable         	= CASUSER.PROMO_ENH;
+		%let mpPromoPboTable 	 	= CASUSER.PROMO_PBO_ENH_UNFOLD;
+		%let mpPromoProdTable   	= CASUSER.PROMO_PROD_ENH;
+	%end;
+		
+	
     proc casutil;  
         droptable casdata="&lmvOutTableName" incaslib="&lmvOutTableCLib" quiet;
     run;
@@ -326,8 +342,8 @@
                 , t1.PRODUCT_QTY
                 , t1.START_DT
                 , t1.END_DT
-                , coalesce(t1.GROSS_PRICE_PT, t1.GROSS_PRICE_REG_FUTURE, 0) as GROSS_PRICE_TMP
-                , coalesce(t1.GROSS_PRICE_PT, t1.GROSS_PRICE_REG_FUTURE, 0) * PRODUCT_QTY as QTY_MULT_PRICE
+                , coalesce(t1.GROSS_PRICE_PT, 0) as GROSS_PRICE_TMP
+                , coalesce(t1.GROSS_PRICE_PT, 0) * PRODUCT_QTY as QTY_MULT_PRICE
             from CASUSER.PROMO_FILT_SKU_PBO t1
             where upper(t1.PROMO_MECHANICS) in &lmvBogoList
         ;
