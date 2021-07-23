@@ -787,21 +787,22 @@
 		  WHERE t1.CHANNEL_CD = 'ALL';
 	QUIT;
 	
-	DATA casuser.PBO_SM_TRAIN_TRP(replace=yes);
+	proc casutil;
+		droptable incaslib="&lmvLibrefOut." casdata="&lmvTabNmOut." quiet;
+		droptable incaslib="&lmvLibrefOutABT." casdata="&lmvTabNmOutABT." quiet;
+	run;
+		
+	DATA &lmvLibrefOut..&lmvTabNmOut.(promote=yes);
 		set casuser.PBO_SM_TRAIN_TRP(where=(sales_dt>=intnx('year', sales_dt, -4, 'B')));
 		format sales_dt date9.;
 	RUN;
 	
-	DATA casuser.GC_TRAIN_ABT_TRP(replace=yes);
+	DATA &lmvLibrefOutABT..&lmvTabNmOutABT.(promote=yes);
 		set casuser.GC_TRAIN_ABT_TRP(where=(sales_dt>=intnx('year', sales_dt, -4, 'B')));
 		format sales_dt date9.;
 	RUN;
 	
 	proc casutil;
-		droptable incaslib="&lmvLibrefOut." casdata="&lmvTabNmOut." quiet;
-		droptable incaslib="&lmvLibrefOutABT." casdata="&lmvTabNmOutABT." quiet;
-		promote incaslib='casuser' casdata='PBO_SM_TRAIN_TRP' outcaslib="&lmvLibrefOut." casout="&lmvTabNmOut.";
-		promote incaslib='casuser' casdata='GC_TRAIN_ABT_TRP' outcaslib="&lmvLibrefOutABT." casout="&lmvTabNmOutABT.";
 		save incaslib="&lmvLibrefOut." outcaslib="&lmvLibrefOut." casdata="&lmvTabNmOut." casout="&lmvTabNmOut..sashdat" replace; 
 		save incaslib="&lmvLibrefOutABT." outcaslib="&lmvLibrefOutABT." casdata="&lmvTabNmOutABT." casout="&lmvTabNmOutABT..sashdat" replace; 
 	run;

@@ -37,7 +37,7 @@
 						
 	%tech_update_resource_status(mpStatus=P, mpResource=price_promo_future);
 	
-	%include "/opt/sas/mcd_config/macro/step/pt/short_term/price_unfold.sas";
+	%price_unfold;
 	
 	%tech_update_resource_status(mpStatus=L, mpResource=price_promo_future);
 	

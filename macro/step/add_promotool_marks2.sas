@@ -140,7 +140,7 @@
 		promo_id_num=max_promo_id+9999+_n_;
 	run;
 
-	data casuser.promo_id_map;
+	data &lmvOutCaslib..promo_id_map(replace=yes);
 		set  work.promo_id_map;
 	run;
 	/* END: Блок для сортировки полученных после интеграции с ПТ промо акций для обеспечения воспроизводимости результата */
@@ -327,12 +327,13 @@
 		coalesce(t1.promo_nm,t2.promo_nm) as promo_nm,
 		coalesce(t1.segment_id,t2.segment_id) as segment_id,
 		coalesce(t1.promo_group_id,t2.promo_group_id,-9999) as promo_group_id,
-		t1.promo_price_amt as promo_price_amt, /*��� ����� ���������*/
+		t1.promo_price_amt as promo_price_amt, /*??? ????? ?????????*/
 		coalesce(t1.start_dt,t2.start_dt) as start_dt,
 		coalesce(t1.end_dt,t2.end_dt) as end_dt,
 		coalesce(t1.np_gift_price_amt,t2.mechanicsExpertReview) as np_gift_price_amt,
 		coalesce(t1.platform,t2.platform) as platform,
-		coalesce(t1.location_based_pricing,t2.location_based_pricing) as location_based_pricing
+		coalesce(t1.location_based_pricing,t2.location_based_pricing) as location_based_pricing,
+		case when t2.promo_id is not null then 1 else 0 end as from_pt
 		from &lmvOutCaslib..promo t1 full outer join &lmvOutCaslib..pt_promo2ext t2
 		on t1.promo_id=t2.promo_id
 		;
@@ -485,7 +486,7 @@
 /*Для этого набора промо-механик новинки заводятся только для промо-товаров из списка*/
 	proc fedsql sessref=casauto;
 		create table &lmvOutCaslib..promo_prod_intersect{options replace=true} as
-		select t2.product_id as successor_product_id,
+		select distinct t2.product_id as successor_product_id,
 				t4.pbo_location_id as successor_dim2_id, 
 				t3.start_dt as successor_start_dt, 
 				t3.end_dt as predecessor_end_dt
@@ -505,7 +506,7 @@
 				'Gift for purchase (for ordres above X rub)',
 				'Bundle',
 				'Other: Collaboration'
-			);
+			) and t3.from_pt=1; /*process only lifecycle from promotool*/
 	quit;
 
 /*		Для этого набора промо новинки заводятся для ВСЕХ товаров
@@ -528,7 +529,7 @@
 				'Product : new launch LTO',
 				'Product : new launch Permanent incl item rotation',
 				'Product : line-extension'
-			);
+			) and t3.from_pt=1; /*process only lifecycle from promotool*/
 	quit;
 
 	data &lmvOutCaslib..promo_prod_intersect2;
@@ -545,32 +546,33 @@
 	run;
 
 	proc casutil;
-		droptable casdata='product_attr1' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_prod_list' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_prod_intersect' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_prod_intersect2' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='pt_promo1' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='pt_detail_transposed' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_id_exp' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='max_promo_id' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_id_map' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='pt_promo2' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='pt_promo3' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promopbo_app' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='media' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='max_promo_group_id' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='media_ext' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_group_id_map' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='media_app' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_detail_spl' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promoprod_app1' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='pt_promo2ext' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_pbo' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='promo_prod' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='product_chain_add1' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='product_chain_add2' incaslib="&lmvOutCaslib." quiet;
-		droptable casdata='product_chain1' incaslib="&lmvOutCaslib." quiet;
+ 		droptable casdata='product_attr1' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_prod_list' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_prod_intersect' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_prod_intersect2' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='pt_promo1' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='pt_detail_transposed' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_id_exp' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='max_promo_id' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_id_map' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='pt_promo2' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='pt_promo3' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promopbo_app' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='media' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='max_promo_group_id' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='media_ext' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_group_id_map' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='media_app' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_detail_spl' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promoprod_app1' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='pt_promo2ext' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='promo_pbo' incaslib="&lmvOutCaslib." quiet;
+ 		droptable casdata='promo_prod' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='product_chain_add1' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='product_chain_add2' incaslib="&lmvOutCaslib." quiet; 
+ 		droptable casdata='product_chain1' incaslib="&lmvOutCaslib." quiet; 
 	quit;
 	
 %mend add_promotool_marks2;
+

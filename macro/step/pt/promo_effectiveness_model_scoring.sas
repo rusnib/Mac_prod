@@ -130,13 +130,25 @@ Undefined
 	quit;
 	
 	/* Расшиваем интервалы по дням */
-	data public.na_abt1;
+	data public.na_abt0;
 		set public.promo_skelet;
 		format sales_dt DATE9.;
 		do sales_dt=start_dt to end_dt;
 			output;
 		end;
 	run;
+
+	/* Оставляем только текущий год */
+	proc fedsql sessref=casauto;
+		create table public.na_abt1{options replace=true} as
+			select
+				*
+			from
+				public.na_abt0
+			where
+				year(sales_dt) = year(&ETL_CURRENT_DT_DB)
+		;
+	quit;
 	
 	proc casutil;
 		droptable casdata="pbo_lvl_all" incaslib="public" quiet;
@@ -221,6 +233,7 @@ Undefined
 	quit;
 	
 	proc casutil;
+		droptable casdata="na_abt0" incaslib="public" quiet;
 		droptable casdata="na_abt1" incaslib="public" quiet;
 		droptable casdata="promo_mechanics" incaslib="public" quiet;
 		droptable casdata="promo_mechanics_one_hot" incaslib="public" quiet;
@@ -855,16 +868,15 @@ Undefined
 			* data : скоринговая выборка
 	*/
 	/****** Скоринг ******/
+    proc astore;
+        upload RSTORE=public.&target._prediction_model store="/data/ETL_BKP/&target._prediction_model";
+    run;
+
+
 	proc casutil;
 	    droptable casdata="promo_effectivness_&target._predict" incaslib="public" quiet;
-		
-/* 		load data=nac.&target._prediction_model casout="&target._prediction_model" outcaslib='public' replace; */
 	run;
-	
-	/* Промоутим */
-/* 	proc casutil; */
-/* 	    promote casdata="&target._prediction_model" incaslib="public" outcaslib="public"; */
-/* 	run;	 */
+
 
 	proc astore;
 		score data=&data.

@@ -81,25 +81,26 @@ run;
 %mend;
 
 %macro promo_effectiveness_abt_building(
-	promo_lib = public, 
-	ia_promo = ia_promo,
-	ia_promo_x_pbo = ia_promo_x_pbo,
-	ia_promo_x_product = ia_promo_x_product,
+	promo_lib = casuser, 
+	ia_promo = past_promo,
+	ia_promo_x_pbo = promo_pbo_enh,
+	ia_promo_x_product = promo_prod_enh,
 	hist_start_dt = date '2019-01-01',
+	ia_media = media_enh,
 	filter = t1.channel_cd = 'ALL',
 	calendar_start = '01jan2017'd,
 	calendar_end = '01jan2022'd
 );
 
-%let promo_lib = casuser;
-%let ia_promo = promo_enh;
-%let ia_promo_x_pbo = promo_pbo_enh;
-%let ia_promo_x_product = promo_prod_enh;
-%let ia_media = media_enh;
-%let hist_start_dt = date '2019-01-01';
-%let filter = t1.channel_cd = 'ALL';
-%let calendar_start = '01jan2017'd;
-%let calendar_end = '01jan2022'd;
+/* %let promo_lib = casuser; */
+/* %let ia_promo = past_promo; */
+/* %let ia_promo_x_pbo = promo_pbo_enh; */
+/* %let ia_promo_x_product = promo_prod_enh; */
+/* %let ia_media = media_enh; */
+/* %let hist_start_dt = date '2019-01-01'; */
+/* %let filter = t1.channel_cd = 'ALL'; */
+/* %let calendar_start = '01jan2017'd; */
+/* %let calendar_end = '01jan2022'd; */
 
 /*
 	Макрос, который собирает обучающую выборку для модели прогнозирующей
@@ -125,7 +126,7 @@ run;
 	----------
 		* promo_lib: библиотека, где лежат таблицы с промо (предполагается,
 			что таблицы лежат в cas)
-		*\\ ia_promo: название таблицы с информацией о промо 
+		* ia_promo: название таблицы с информацией о промо 
 		* ia_promo_x_pbo: название таблицы с привязкой промо к ресторнам
 		* ia_promo_x_product: название таблицы с привязкой промо к товарам
 		* hist_start_dt: рассматриваем все промо, начавшиеся после этой даты
@@ -1171,213 +1172,269 @@ run;
 
 
 	/****** 9. Признаки описывающие продажи промо товаров ******/
-/*  */
-/* 	Создаем временные ряды продаж мастеркодов */
-/* 	proc sql; */
-/* 		create table nac.pmix_mastercode_sum as */
-/* 			select */
-/* 				t1.pbo_location_id, */
-/* 				t1.PROD_LVL4_ID, */
-/* 				t1.sales_dt, */
-/* 				sum(t1.sales_qty) as sales_qty */
-/* 			from ( */
-/* 				select */
-/* 					t2.PROD_LVL4_ID, */
-/* 					t1.sales_dt, */
-/* 					t1.pbo_location_id, */
-/* 					sum(t1.sales_qty, t1.sales_qty_promo) as sales_qty	 */
-/* 				from ( */
-/* 					select  */
-/* 						*  */
-/* 					from */
-/* 						etl_ia.pmix_sales */
-/* 					where */
-/* 						&ETL_CURRENT_DTTM. <= valid_to_dttm and */
-/* 						&ETL_CURRENT_DTTM. >= valid_from_dttm */
-/*  */
-/* 				) as t1 */
-/* 				inner join */
-/* 					nac.product_dictionary_ml as t2 */
-/* 				on */
-/* 					t1.product_id = t2.product_id */
-/* 				where */
-/* 					t1.channel_cd = 'ALL' */
-/* 			) as t1 */
-/* 			group by */
-/* 				t1.pbo_location_id, */
-/* 				t1.PROD_LVL4_ID, */
-/* 				t1.sales_dt */
-/* 		; */
-/* 	quit; */
-/*  */
-/* 	Выгружаем таблицу в cas */
-/* 	data public.pmix_mastercode_sum; */
-/* 		set nac.pmix_mastercode_sum; */
-/* 	run; */
-/* 	 */
-/* 	Снова создадим таблицу с промо акциями */
-/* 	proc fedsql sessref=casauto; */
-/* 		create table public.promo_ml{options replace = true} as  */
-/* 			select */
-/* 				t1.PROMO_ID, */
-/* 				t1.start_dt, */
-/* 				t1.end_dt, */
-/* 				t1.promo_mechanics, */
-/* 				t3.product_id, */
-/* 				t2.pbo_location_id */
-/* 			from */
-/* 				&promo_lib..&ia_promo. as t1  */
-/* 			left join */
-/* 				public.ia_promo_x_pbo_leaf as t2 */
-/* 			on  */
-/* 				t1.PROMO_ID = t2.PROMO_ID */
-/* 			left join */
-/* 				public.ia_promo_x_product_leaf as t3 */
-/* 			on */
-/* 				t1.PROMO_ID = t3.PROMO_ID */
-/* 			where */
-/* 				&filter. */
-/* 		; */
-/* 	quit; */
-/* 	 */
-/* 	Меняем товары на мастеркоды  */
-/* 	proc fedsql sessref=casauto; */
-/* 		create table public.promo_ml2{options replace = true} as  */
-/* 			select distinct */
-/* 				t1.PROMO_ID, */
-/* 				t2.PROD_LVL4_ID, */
-/* 				t1.pbo_location_id */
-/* 			from */
-/* 				public.promo_ml as t1 */
-/* 			inner join */
-/* 				public.product_dictionary_ml as t2 */
-/* 			on */
-/* 				t1.product_id = t2.product_id */
-/* 		; */
-/* 	quit; */
-/* 	 */
-/* 	Соединяем продажи с промо */
-/* 	proc fedsql sessref=casauto; */
-/* 		create table public.promo_ml3{options replace = true} as  */
-/* 			select */
-/* 				t1.promo_id, */
-/* 				t1.pbo_location_id, */
-/* 				t2.sales_dt, */
-/* 				mean(t2.sales_qty) as mean_sales_qty */
-/* 			from */
-/* 				public.promo_ml2 as t1 */
-/* 			left join */
-/* 				public.pmix_mastercode_sum as t2 */
-/* 			on */
-/* 				t1.PROD_LVL4_ID = t2.PROD_LVL4_ID and */
-/* 				t1.pbo_location_id = t2.pbo_location_id */
-/* 			group by */
-/* 				t1.promo_id, */
-/* 				t1.pbo_location_id, */
-/* 				t2.sales_dt			 */
-/* 		; */
-/* 	quit; */
-/* 	 */
-/* 	Считаем агрегаты Промо, ПБО, год, месяц, день недели */
-/* 	proc fedsql sessref=casauto; */
-/* 		create table public.pmix_aggr_smart{options replace=true} as */
-/* 			select */
-/* 				t1.promo_id, */
-/* 				t1.pbo_location_id, */
-/* 				t1.year, */
-/* 				t1.month, */
-/* 				t1.weekday, */
-/* 				mean(t1.mean_sales_qty) as mean_sales_qty, */
-/* 				std(t1.mean_sales_qty) as std_sales_qty */
-/* 			from ( */
-/* 				select */
-/* 					t1.promo_id, */
-/* 					t1.pbo_location_id, */
-/* 					year(t1.sales_dt) as year, */
-/* 					month(t1.sales_dt) as month, */
-/* 					weekday(t1.sales_dt) as weekday, */
-/* 					t1.mean_sales_qty */
-/* 				from */
-/* 					public.promo_ml3 as t1 */
-/* 			) as t1 */
-/* 			group by */
-/* 				t1.promo_id, */
-/* 				t1.pbo_location_id, */
-/* 				t1.year, */
-/* 				t1.month, */
-/* 				t1.weekday */
-/* 		; */
-/* 	quit; */
-/* 	 */
-/* 	Считаем агрегаты Промо, год, месяц, день недели */
-/* 	proc fedsql sessref=casauto; */
-/* 		create table public.pmix_aggr_dump{options replace=true} as */
-/* 			select */
-/* 				t1.promo_id, */
-/* 				t1.year, */
-/* 				t1.month, */
-/* 				t1.weekday, */
-/* 				mean(t1.mean_sales_qty) as mean_sales_qty, */
-/* 				std(t1.mean_sales_qty) as std_sales_qty */
-/* 			from ( */
-/* 				select */
-/* 					t1.promo_id, */
-/* 					year(t1.sales_dt) as year, */
-/* 					month(t1.sales_dt) as month, */
-/* 					weekday(t1.sales_dt) as weekday, */
-/* 					t1.mean_sales_qty */
-/* 				from */
-/* 					public.promo_ml3 as t1 */
-/* 			) as t1 */
-/* 			group by */
-/* 				t1.promo_id, */
-/* 				t1.year, */
-/* 				t1.month, */
-/* 				t1.weekday */
-/* 		; */
-/* 	quit; */
-/* 	 */
-/* 	Добавляем к витрине характеристики трафика ресторана */
-/* 	proc fedsql sessref=casauto; */
-/* 		create table public.na_abt9{options replace=true} as */
-/* 			select */
-/* 				t1.*, */
-/* 				coalesce(t2.mean_sales_qty, t3.mean_sales_qty) as mean_sales_qty, */
-/* 				coalesce(t2.std_sales_qty, t3.std_sales_qty) as std_sales_qty */
-/* 			from */
-/* 				public.na_abt8 as t1 */
-/* 			left join */
-/* 				public.pmix_aggr_smart as t2 */
-/* 			on */
-/* 				t1.promo_id = t2.promo_id and */
-/* 				(t1.year - 1) = t2.year and */
-/* 				t1.pbo_location_id = t2.pbo_location_id and */
-/* 				t1.month = t2.month and */
-/* 				t1.weekday = t2.weekday */
-/* 			left join */
-/* 				public.pmix_aggr_dump as t3 */
-/* 			on */
-/* 				t1.promo_id = t3.promo_id and */
-/* 				(t1.year - 1) = t3.year and */
-/* 				t1.month = t3.month and */
-/* 				t1.weekday = t3.weekday */
-/* 		; */
-/* 	quit; */
-/*  */
-/* 	%raws_count(public,na_abt9); */
-/* 	 */
-/* 	proc casutil; */
-/* 		droptable casdata="pmix_mastercode_sum" incaslib="public" quiet; */
-/* 		droptable casdata="na_abt8" incaslib="public" quiet; */
-/* 		droptable casdata="promo_ml2" incaslib="public" quiet; */
-/* 		droptable casdata="promo_ml3" incaslib="public" quiet; */
-/* 		droptable casdata="pmix_aggr_smart" incaslib="public" quiet; */
-/* 		droptable casdata="pmix_aggr_dump" incaslib="public" quiet; */
-/* 	run; */
+	/* TODO, может быть группировать мастеркоды в промо по категориям?	 */
+	/* Создаем временные ряды продаж мастеркодов */
+	proc sql;
+		create table nac.pmix_mastercode_sum as
+			select
+				t1.pbo_location_id,
+				t1.PROD_LVL4_ID,
+				t1.sales_dt,
+				sum(t1.sales_qty) as sales_qty
+			from (
+				select
+					t2.PROD_LVL4_ID,
+					t1.sales_dt,
+					t1.pbo_location_id,
+					sum(t1.sales_qty, t1.sales_qty_promo) as sales_qty	
+				from (
+					select 
+						* 
+					from
+						etl_ia.pmix_sales
+					where
+						&ETL_CURRENT_DTTM. <= valid_to_dttm and
+						&ETL_CURRENT_DTTM. >= valid_from_dttm and
+						channel_cd = 'ALL'
+				) as t1
+				inner join
+					nac.product_dictionary_ml as t2
+				on
+					t1.product_id = t2.product_id
+			) as t1
+			group by
+				t1.pbo_location_id,
+				t1.PROD_LVL4_ID,
+				t1.sales_dt
+		;
+	quit;
+
+	/* 	Выгружаем таблицу в cas */
+	data public.pmix_mastercode_sum;
+		set nac.pmix_mastercode_sum;
+	run;
+	
+	/* 	Снова создадим таблицу с промо акциями */
+	proc fedsql sessref=casauto;
+		create table public.promo_ml{options replace = true} as 
+			select
+				t1.PROMO_ID,
+				t1.start_dt,
+				t1.end_dt,
+				t1.promo_mechanics,
+				t3.product_id,
+				t2.pbo_location_id
+			from
+				&promo_lib..&ia_promo. as t1 
+			inner join
+				public.ia_promo_x_pbo_leaf as t2
+			on 
+				t1.PROMO_ID = t2.PROMO_ID
+			inner join
+				public.ia_promo_x_product_leaf as t3
+			on
+				t1.PROMO_ID = t3.PROMO_ID
+			where
+				&filter.
+		;
+	quit;
+	
+	/* 	Меняем товары на мастеркоды  */
+	proc fedsql sessref=casauto;
+		create table public.promo_ml2{options replace = true} as 
+			select distinct
+				t1.PROMO_ID,
+				t1.start_dt,
+				t2.PROD_LVL4_ID,
+				t1.pbo_location_id
+			from
+				public.promo_ml as t1
+			inner join
+				public.product_dictionary_ml as t2
+			on
+				t1.product_id = t2.product_id
+		;
+	quit;
+	
+	/* 	Соединяем продажи с промо */
+	proc fedsql sessref=casauto;
+		create table public.promo_ml3{options replace = true} as 
+			select
+				t1.promo_id,
+				t1.pbo_location_id,
+				t1.start_dt,
+				t2.sales_dt,
+				mean(t2.sales_qty) as mean_sales_qty
+			from
+				public.promo_ml2 as t1
+			inner join
+				public.pmix_mastercode_sum as t2
+			on
+				t1.PROD_LVL4_ID = t2.PROD_LVL4_ID and
+				t1.pbo_location_id = t2.pbo_location_id
+			group by
+				t1.promo_id,
+				t1.pbo_location_id,
+				t1.start_dt,
+				t2.sales_dt			
+		;
+	quit;
+	
+	/* 	Считаем агрегаты Промо, ПБО, год, месяц, день недели */
+	proc fedsql sessref=casauto;
+		create table public.pmix_aggr_smart{options replace=true} as
+			select
+				t1.promo_id,
+				t1.pbo_location_id,
+				t1.year,
+				t1.month,
+				t1.weekday,
+				mean(t1.mean_sales_qty) as mean_sales_qty,
+				std(t1.mean_sales_qty) as std_sales_qty
+			from (
+				select
+					t1.promo_id,
+					t1.pbo_location_id,
+					year(t1.sales_dt) as year,
+					month(t1.sales_dt) as month,
+					weekday(t1.sales_dt) as weekday,
+					t1.mean_sales_qty
+				from
+					public.promo_ml3 as t1
+			) as t1
+			group by
+				t1.promo_id,
+				t1.pbo_location_id,
+				t1.year,
+				t1.month,
+				t1.weekday
+		;
+	quit;
+	
+	/* 	Считаем агрегаты Промо, год, месяц, день недели */
+	proc fedsql sessref=casauto;
+		create table public.pmix_aggr_dump{options replace=true} as
+			select
+				t1.promo_id,
+				t1.year,
+				t1.month,
+				t1.weekday,
+				mean(t1.mean_sales_qty) as mean_sales_qty,
+				std(t1.mean_sales_qty) as std_sales_qty
+			from (
+				select
+					t1.promo_id,
+					year(t1.sales_dt) as year,
+					month(t1.sales_dt) as month,
+					weekday(t1.sales_dt) as weekday,
+					t1.mean_sales_qty
+				from
+					public.promo_ml3 as t1
+			) as t1
+			group by
+				t1.promo_id,
+				t1.year,
+				t1.month,
+				t1.weekday
+		;
+	quit;
+
+	/* 
+		Возможно, год назад мастеркод не продавался в ресторане.
+		Например, если ресторан новый. В таком случае просто усредним
+		продажи мастеркода до даты начала промо
+	*/
+	proc fedsql sessref=casauto;
+		create table public.pmix_basic_aggr_smart{options replace=true} as
+			select
+				t1.promo_id,
+				t1.pbo_location_id,
+				mean(t1.mean_sales_qty) as mean_sales_qty,
+				std(t1.mean_sales_qty) as std_sales_qty
+			from 
+				public.promo_ml3 as t1
+			where
+				sales_dt < start_dt
+			group by
+				t1.promo_id,
+				t1.pbo_location_id
+		;
+	quit;
+
+	/* 
+		Возможно, год назад мастеркод не продавался во всей сети.
+		Например, товар был временно выведен.
+	*/
+	proc fedsql sessref=casauto;
+		create table public.pmix_basic_aggr_dump{options replace=true} as
+			select
+				t1.promo_id,
+				mean(t1.mean_sales_qty) as mean_sales_qty,
+				std(t1.mean_sales_qty) as std_sales_qty
+			from 
+				public.promo_ml3 as t1
+			where
+				sales_dt < start_dt
+			group by
+				t1.promo_id
+		;
+	quit;
+	
+	/* 	Добавляем к витрине характеристики характеристики продаж мастеркодов */
+	proc fedsql sessref=casauto;
+		create table public.na_abt9{options replace=true} as
+			select
+				t1.*,
+				coalesce(t2.mean_sales_qty, t3.mean_sales_qty, t4.mean_sales_qty, t5.mean_sales_qty) as mean_sales_qty,
+				coalesce(t2.std_sales_qty, t3.std_sales_qty, t4.std_sales_qty, t5.std_sales_qty) as std_sales_qty
+			from
+				public.na_abt8 as t1
+			left join
+				public.pmix_aggr_smart as t2
+			on
+				t1.promo_id = t2.promo_id and
+				(t1.year - 1) = t2.year and
+				t1.pbo_location_id = t2.pbo_location_id and
+				t1.month = t2.month and
+				t1.weekday = t2.weekday
+			left join
+				public.pmix_aggr_dump as t3
+			on
+				t1.promo_id = t3.promo_id and
+				(t1.year - 1) = t3.year and
+				t1.month = t3.month and
+				t1.weekday = t3.weekday
+			left join
+				public.pmix_basic_aggr_smart as t4
+			on
+				t1.promo_id = t4.promo_id and
+				t1.pbo_location_id = t4.pbo_location_id
+			left join
+				public.pmix_basic_aggr_dump as t5
+			on
+				t1.promo_id = t5.promo_id	
+		;
+	quit;
+
+	%raws_count(public,na_abt9);
+	
+	proc casutil;
+		droptable casdata="pmix_mastercode_sum" incaslib="public" quiet;
+		droptable casdata="na_abt8" incaslib="public" quiet;
+		droptable casdata="promo_ml2" incaslib="public" quiet;
+		droptable casdata="promo_ml3" incaslib="public" quiet;
+		droptable casdata="pmix_aggr_smart" incaslib="public" quiet;
+		droptable casdata="pmix_aggr_dump" incaslib="public" quiet;
+	run;
 
 	/****** 10. Добавление целевой переменной и фильтрации ******/
 		
 	/*
+		TODO:
+			Подумать над фильтрацией с датой открытия, закрытия ресторна. Просто когда мы указываем в промо туле
+			что акция действует на все рестораны, мы распространяем действие этой акции и на уже закрытые рестораны,
+			еще не открытые и т.д.
+
 		АЛГОРИТМ ФИЛЬТРАЦИИ:
 		
 		0. Убираем временные закрытия
@@ -1423,13 +1480,13 @@ run;
 
 	/* Добавляем целевую переменную */
 	proc fedsql sessref=casauto;
-		create table public.na_abt9{options replace=true} as
+		create table public.na_abt9_1{options replace=true} as
 			select
 				t1.*,
 				t3.n_a,
 				t3.t_a	
 			from
-				public.na_abt8 as t1
+				public.na_abt9 as t1
 			inner join
 				(select distinct promo_id from public.na_calculation_result) as t2
 			on
@@ -1447,7 +1504,7 @@ run;
 		;
 	quit;
 
-	%raws_count(public,na_abt9);
+	%raws_count(public,na_abt9_1);
 
 	/* Убираем временные закрытия */
 	/* 
@@ -1469,7 +1526,7 @@ run;
 			select
 				t1.*
 			from
-				public.na_abt9 as t1
+				public.na_abt9_1 as t1
 			left join
 				public.pbo_close_period as t2
 			on
@@ -1498,7 +1555,7 @@ run;
 					pbo_location_id,
 					nmiss(n_a) as nmiss
 				from
-					public.na_abt9
+					public.na_abt9_1
 				group by
 					promo_id,
 					pbo_location_id
@@ -1535,6 +1592,7 @@ run;
 	quit;
 
 	%raws_count(public,na_abt11);
+
 
 	proc fedsql sessref=casauto;
 		/* Определяем концы интрвала */
@@ -1580,6 +1638,7 @@ run;
 				promo_id,
 				pbo_location_id,
 				mean(t_a) as mean_t_a,
+				mean(n_a) as mean_n_a,
 				std(t_a) as std_t_a
 			from
 				public.na_abt12
@@ -1665,12 +1724,14 @@ run;
 				VICTORY_DAY, 
 				MEAN_RECEIPT_QTY, 
 				STD_RECEIPT_QTY, 
+				mean_sales_qty,
+				std_sales_qty,
 				(case
-					when abs(t_a - mean_t_a) < 2.5*std_t_a then t_a
+					when abs(t_a - mean_t_a) <= 2.5*coalesce(std_t_a, 0) then t_a
 					else .
 				end) as t_a,
 				(case
-					when abs(t_a - mean_t_a) < 2.5*std_t_a then n_a
+					when abs(t_a - mean_t_a) <= 2.5*coalesce(std_t_a, 0) then n_a
 					else .
 				end) as n_a
 			from
@@ -1685,7 +1746,7 @@ run;
 
 	%raws_count(public,na_abt13);
 
-	/* Если mean t_a < 10 то миссинги заменяем на нули */
+	/* Если mean t_a < 10 то миссинги заменяем на нули иначе просто средним */
 	proc fedsql sessref=casauto;
 		create table public.na_abt14{option replace=true} as
 			select
@@ -1764,12 +1825,16 @@ run;
 				VICTORY_DAY, 
 				MEAN_RECEIPT_QTY, 
 				STD_RECEIPT_QTY, 
+				mean_sales_qty,
+				std_sales_qty,
 				(case
-					when t_a is missing and mean_t_a <= 10 then 0
+					when (t_a is missing) and (t2.mean_t_a <= 10) then 0
+					when (t_a is missing) and (t2.mean_t_a > 10) then t2.mean_t_a
 					else t_a
 				end) as t_a,
 				(case
-					when t_a is missing and mean_t_a <= 10 then 0
+					when (t_a is missing) and (t2.mean_t_a <= 10) then 0
+					when (t_a is missing) and (t2.mean_t_a > 10) then t2.mean_n_a
 					else n_a
 				end) as n_a
 			from
@@ -1784,31 +1849,6 @@ run;
 
 	%raws_count(public,na_abt14);
 
-	data work.na_abt14;
-		set public.na_abt14;
-	run;
-	
-	proc sort data=work.na_abt14 out=work.na_abt14_sorted;
-		by promo_id pbo_location_id sales_dt;
-	run;
-	
-	option nonotes;
-
-	/* Заполняем пропуски при помощи proc expand */
-	proc expand data = work.na_abt14_sorted out = work.na_abt15 ;
-		 convert n_a=n_a_expand;
-		 convert t_a=t_a_expand;
-		 id sales_dt;
-		 by promo_id pbo_location_id;
-	run;
-
-	option notes;
-	
-	data public.na_abt15;
-		set work.na_abt15;
-	run;
-
-	%raws_count(public,na_abt15);
 
 /* 	proc casutil; */
 /* 		droptable casdata="na_abt9" incaslib="public" quiet;	 */
@@ -1816,8 +1856,20 @@ run;
 /* 	run; */
 	
 	/* Дополнительно сохраняем витрину в Nac */
-	data nac.na_abt15;
-		set work.na_abt15;
+	data nac.na_abt14;
+		set public.na_abt14;
 	run;
 
 %mend;
+
+%promo_effectiveness_abt_building(
+	promo_lib = casuser, 
+	ia_promo = past_promo,
+	ia_promo_x_pbo = promo_pbo_enh,
+	ia_promo_x_product = promo_prod_enh,
+	hist_start_dt = date '2019-01-01',
+	ia_media = media_enh,
+	filter = t1.channel_cd = 'ALL',
+	calendar_start = '01jan2017'd,
+	calendar_end = '01jan2022'd
+);

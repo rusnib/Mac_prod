@@ -48,7 +48,7 @@
 		%if %sysfunc(SESSFOUND(&lmvCasSessName)) = 0 %then %do; 
 			cas &lmvCasSessName. 
 			%if %length(&lmvAuthinfoUsr.) gt 0 %then %do; authinfo="/home/&lmvAuthinfoUsr./.authinfo_cas" %end;
-			sessopts=(metrics=true) ;
+			sessopts=(metrics=true) HOST="rumskap102.ru-central1.internal" PORT=5570;
 			
 			%if &lmvAssignFlg. = Y %then %do;
 				caslib _ALL_ ASSIGN SESSREF=&lmvCasSessName.;

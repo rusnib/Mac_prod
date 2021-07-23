@@ -47,6 +47,7 @@
 	%load_komp_matrix;
 	/* non-komp*/
 	
+	/* plan_upt_month */
 	proc casutil;
 		droptable casdata="&lmvOutTabNameUptLt._nonkomp" incaslib="&lmvOutLibrefUptLt." quiet;
 	quit;
@@ -80,7 +81,7 @@
 	quit;
 
 
-
+	/* plan_pmix_month */
 	proc casutil;
 		droptable casdata="&lmvOutTabNamePmixLt._nonkomp" incaslib="&lmvOutLibrefPmixLt." quiet;
 	quit;
@@ -111,7 +112,7 @@
 	quit;
 
 
-
+	/* plan_gc_month */
 	proc casutil;
 		droptable casdata="&lmvOutTabNameGcLt._nonkomp" incaslib="&lmvOutLibrefGcLt." quiet;
 	quit;
@@ -153,7 +154,7 @@
 		from &lmvOutLibrefUptSt..&lmvOutTabNameUptSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 0
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 0
 		;
 	quit;
 
@@ -177,7 +178,7 @@
 		from &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 0
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 0
 		;
 	quit;
 
@@ -201,7 +202,7 @@
 		from &lmvOutLibrefGcSt..&lmvOutTabNameGcSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 0
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 0
 		;
 	quit;	
 		
@@ -334,7 +335,7 @@
 		from &lmvOutLibrefUptSt..&lmvOutTabNameUptSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		where DATA <= INTNX( 'MONTH', today(), 1, 'SAMEDAY')
 		;
 	quit;	
@@ -359,7 +360,7 @@
 		from &lmvOutLibrefUptSt..&lmvOutTabNameUptSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		where DATA > INTNX( 'MONTH', today(), 1, 'SAMEDAY')
 		and DATA <= INTNX( 'MONTH', today(), 2, 'SAMEDAY')
 		;
@@ -384,7 +385,7 @@
 		from &lmvOutLibrefUptSt..&lmvOutTabNameUptSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		where DATA > INTNX( 'MONTH', today(), 2, 'SAMEDAY')
 		;
 	quit;	
@@ -437,7 +438,7 @@
 		from &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		where DATA <= INTNX( 'MONTH', today(), 1, 'SAMEDAY')
 		;
 	quit;	
@@ -462,7 +463,7 @@
 		from &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		where DATA > INTNX( 'MONTH', today(), 1, 'SAMEDAY')
 		and DATA <= INTNX( 'MONTH', today(), 2, 'SAMEDAY')
 		;
@@ -487,7 +488,7 @@
 		from &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		where DATA > INTNX( 'MONTH', today(), 2, 'SAMEDAY')
 		;
 	quit;	
@@ -514,7 +515,7 @@
 		from &lmvOutLibrefGcSt..&lmvOutTabNameGcSt. t1
 		inner join casuser.komp_matrix t2
 			on t1.LOCATION = t2.pbo_location_id
-			and t1.DATA = t2.month and t2.KOMP_ATTRIB = 1
+			and intnx('month',t1.DATA,0,'b') = t2.month and t2.KOMP_ATTRIB = 1
 		;
 	quit;	
 

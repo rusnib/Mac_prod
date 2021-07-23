@@ -51,6 +51,9 @@
 									mpOutNnetWp=mn_dict.nnet_wp1,
 									mpPrmt=Y,
 									mpInLibref=mn_short,
+									mpInPboTable=MN_DICT.PBO_FORECAST_RESTORED,
+									mpInGCTable=MN_DICT.GC_FORECAST_RESTORED,
+									mpInPrices=MN_DICT.PRICE_FULL_SKU_PBO_DAY,
 									mpAuth = YES);
 	
 	

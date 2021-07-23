@@ -57,8 +57,8 @@ mpOutTableNm 			имя таблицы, например, UPT_ALERT_YEAR_TREND
 			, loc.&mpLocLvl.
 			, prod.&mpProdLvl.
 			, main.DATA as sales_dt			
-			, sum(main.TOTAL_FCST_QNT_MON	) as sum_predict_pmix
-			, avg(main.BASE_FORECAST_GC_M	) as sum_predict_gc
+			, sum(main.OVERRIDED_FCST_UNITS	) as sum_predict_pmix
+			, avg(main.OVERRIDED_FCST_GC	) as sum_predict_gc
 		from 
 			CASUSER.UPT_FCST_MONTH as main
 		left join casuser.pbo_dictionary as loc

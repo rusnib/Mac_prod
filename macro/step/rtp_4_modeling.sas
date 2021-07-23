@@ -221,6 +221,11 @@
 							mpPrefix = &model_prefix.,
 							mpStart = 1);
 	%end;
+	%if &SYSCC gt 4 %then %do;
+		/* Return session in execution mode */
+		%put "ERROR: Error in train process";
+		%abort;
+	%end;
 	%if &lmvMode. = SCORE or &lmvMode. = FULL %then %do;
 		%rtp_score_multi(mpThreadCnt=20,
 						mpModelTable=&modeltable.,

@@ -28,11 +28,33 @@
 ****************************************************************************
 *  20-09-2020  Борзунов     Начальное кодирование
 ****************************************************************************/
-%macro dp_export_csv(mpInput=DM_ABT.PLAN_UPT_DAY, mpTHREAD_CNT=10, mpPath=/data/tmp/);
-		%let mvTHREAD_CNT = &mpTHREAD_CNT.;
-		%let mvInput=&mpInput;
-		%let mvTargetName = %scan(&mvInput.,2,%str(.));
-		%let mvPath = &mpPath.;
+%macro dp_export_csv(mpInput=DM_ABT.PLAN_UPT_DAY, mpTHREAD_CNT=10, mpPath=/data/tmp/, mpAuthFlag=Y);
+	%let mvTHREAD_CNT = &mpTHREAD_CNT.;
+	%let mvInput=&mpInput;
+	%let mvTargetName = %scan(&mvInput.,2,%str(.));
+	%let mvPath = &mpPath.;
+	%let mvAuthFlag = %upcase(&mpAuthFlag.);
+	
+	%tech_cas_session(mpMode = start
+					,mpCasSessNm = casauto
+					,mpAssignFlg= y
+					,mpAuthinfoUsr=
+					);
+					
+	/* TRYING EXPORT ENTIRELY */
+	proc export data=&mvInput.
+		outfile="&mvPath.%scan(&mvInput., -1, %str(.)).csv"
+		dbms=dlm
+		replace
+		;
+		delimiter='|'
+		;
+	run;
+	
+	/* WE HAVE A PROBLEM. LET'S GO, RABOTYAGI ! */
+	%if &SYSCC gt 4 %then %do;	
+		OPTIONS NOSYNTAXCHECK OBS=MAX;
+		%let SYSCC = 0;
 		
 		proc casutil;
 			DROPTABLE CASDATA="gen_part" INCASLIB="casuser" QUIET;
@@ -107,8 +129,22 @@
 				RSUBMIT T_&mvTHREAD_NUM. WAIT=NO CMACVAR=T_&mvTHREAD_NUM.;
 					*%tech_redirect_log(mpMode=START, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
 					options notes symbolgen mlogic mprint casdatalimit=all;
-					CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" authinfo="/home/&SYSUSERID./.authinfo_cas" PORT=5570;
-					caslib _all_ assign;
+					%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						%if &mvAuthFlag. eq Y %then %do;
+							,mpAuthinfoUsr=&SYSUSERID.
+						%end;
+						%else %do;
+							,mpAuthinfoUsr=
+						%end;
+						);
+						
+					%if &SYSCC gt 4 %then %do;	
+						%abort;
+					%end;
+					/*CAS T_&mvTHREAD_NUM. HOST="rumskap102.ru-central1.internal" authinfo="/home/&SYSUSERID./.authinfo_cas" PORT=5570;
+					caslib _all_ assign;*/
 					
 					/* MAIN CODE FOR EACH THREAD */
 					%MACRO THREAD_MAIN;
@@ -187,7 +223,7 @@
 				чтобы операция завершилась до момента удаления файлов*/
 				
 				%let part_tables_row = ;
-				%do i = 1 %to 30;
+				%do i = 1 %to &mvTHREAD_CNT.;
 					%let part_tables_row = &part_tables_row. &lmvTargetTableNm._&I..csv;
 				%end;
 				%put &=part_tables_row;
@@ -224,5 +260,6 @@
 			%END;
 			
 		%mend end_thread;
-		%end_thread;	
+		%end_thread;
+	%end;
 %mend dp_export_csv;

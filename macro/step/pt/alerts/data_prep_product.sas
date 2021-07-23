@@ -53,7 +53,7 @@
 	quit;
 
 	proc fedsql sessref=casauto noprint;
-		create table &mpOutCasTable. {options replace=true} as
+		create table CASUSER.FINAL_PROD {options replace=true} as
 		select 
 			  t1.product_id
 			, coalesce(t1.lvl4_id,-9999) as prod_lvl4_id
@@ -69,6 +69,7 @@
 			, t3.A_ITEM_SIZE
 			, t3.A_OFFER_TYPE
 			, t3.A_PRICE_TIER
+			, t3.A_REGULAR_ID
 		from 
 			casuser.product_hier_flat as t1
 		left join 
@@ -88,7 +89,12 @@
 			on t1.lvl2_id = t12.product_id
 		;
 	quit;
-	
+
+	data &mpOutCasTable.;
+		set CASUSER.FINAL_PROD;
+		REGULAR_ID = input(A_REGULAR_ID, best32.);
+	run;
+
 	/* Clear CAS */
 	proc casutil incaslib="CASUSER" ;
 		droptable casdata = "attr_transposed" quiet;
@@ -96,6 +102,7 @@
 		droptable casdata = "PRODUCT_HIERARCHY" quiet;
 		droptable casdata = "PRODUCT" quiet;
 		droptable casdata = "PRODUCT_ATTRIBUTES" quiet;
+		droptable casdata = "FINAL_PROD" quiet;
 	run;
 	
 %mend data_prep_product;

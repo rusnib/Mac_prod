@@ -12,6 +12,9 @@
 		Осталось множество товаров A = {учавствующих в промо} и B = {связанных с промо товарам через мастеркод}.
 			Обозначим C = A U B
 		
+		1.1 Для товаров из множества А поступим по простому:
+			Соберем таблицу промо|промо товар|n_a|коэффциент postivive
+
 		2. Для товаров из множества С придется запустить двойной цикл:
 		
 			Пока промо в множестве промо акций для скоринга:
@@ -328,7 +331,7 @@ Shakes
 	
 	/* Джоиним с таблицей коэффициентов */
 	proc sql noprint;
-		create table nac.upt_scoring as
+		create table work.upt_scoring7 as
 			select
 				t1.promo_id,
 				t1.pbo_location_id,
@@ -360,6 +363,97 @@ Shakes
 				work.simple_upt_parameters2 as t2
 		;
 	quit;
+
+
+	/*** Шаг 1.1 ***/
+
+	/* Добавляем коэффциент positive_promo */
+	proc sql noprint;
+		create table work.positive_promo_effect as
+			select
+				t1.promo_id,
+				t1.pbo_location_id,
+				t1.sales_dt,
+				t1.product_id,
+				t1.p_n_a,
+				coalesce(divide(t2.t, t3.max_t), 0)  as t,
+				coalesce(divide(t2.positive_promo_na, t3.max_positive_promo_na), 0) as positive_promo_na,
+				t3.max_upt * t1.p_n_a * coalesce(divide(t2.positive_promo_na, t3.max_positive_promo_na), 0) as delta,
+				t2.intercept,
+				t3.max_upt
+			from
+				work.upt_scoring2 as t1
+			inner join
+				nac.upt_parameters as t2
+			on
+				t1.product_id = t2.product_id
+			inner join
+				&upt_promo_max. as t3
+			on
+				t1.product_id = t3.product_id
+			where
+				t2._TYPE_ = 'RIDGE'
+		;
+	quit;
+
+	/* Добавляем к коэффциентам дату начала продаж товара */
+	proc sql noprint;
+		create table work.positive_promo_effect2 as
+			select
+				t1.*,
+				t2.min_date
+			from
+				work.positive_promo_effect as t1
+			inner join
+				(select product_id, min(sales_dt) as min_date from nac.upt_train group by product_id) as t2
+			on
+				t1.product_id = t2.product_id
+		;
+	quit;
+
+	/* Считаем baseline */
+	proc sql noprint;
+		create table work.upt_scoring8 as
+			select
+				t1.promo_id,
+				t1.pbo_location_id,
+				t1.sales_dt,
+				t1.product_id,
+				((t1.sales_dt - t1.min_date + 1) * t1.t + t1.intercept) * t1.max_upt as baseline,
+				t1.delta
+			from
+				work.positive_promo_effect2 as t1
+			union
+				select * from work.upt_scoring7 as t2
+		;
+	quit;
+
+	/* Убираем уже закрытые рестораны */
+	proc sql noprint;
+		create table nac.upt_scoring as
+			select
+				t1.*
+			from
+				work.upt_scoring8 as t1
+			left join (
+				select
+					pbo_location_id,
+					input(pbo_loc_attr_value, ddmmyy10.) as close_date format date9.
+				from
+					etl_ia.pbo_loc_attributes
+				where
+					&ETL_CURRENT_DTTM. <= valid_to_dttm and
+					&ETL_CURRENT_DTTM. >= valid_from_dttm and
+					pbo_loc_attr_nm = 'CLOSE_DATE' and
+					pbo_loc_attr_value is not missing
+			) as t2
+			on
+				t1.pbo_location_id = t2.pbo_location_id
+			where
+				(t2.close_date > &ETL_CURRENT_DT.) or 
+				(t2.close_date is missing)
+		;
+	quit;
 	
 	proc datasets library=work nolist;
 		delete upt_scoring1;
@@ -368,6 +462,11 @@ Shakes
 		delete upt_scoring4;
 		delete upt_scoring5;
 		delete upt_scoring6;
+		delete upt_scoring7;
+		delete upt_scoring8;
+
+		delete positive_promo_effect;
+		delete positive_promo_effect2;
 
 		delete simple_upt_parameters2;
 		delete simple_upt_parameters;
@@ -376,7 +475,5 @@ Shakes
 	run;	
 
 %mend;
-
-
 
 

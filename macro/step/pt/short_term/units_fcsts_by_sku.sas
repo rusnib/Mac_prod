@@ -59,7 +59,7 @@ proc fedsql sessref=casauto;
 	from MN_SHORT.PMIX_DAYS_RESULT
 	where channel_cd = 1
 	group by product_id, sales_dt
-;
+	;
 quit;
 
 data casuser.data_fcst;

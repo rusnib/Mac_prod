@@ -12,7 +12,6 @@
 
 %macro scoremodels(PromoCalculationRk);
 
-
 	/*** 1. Инициализация окружения ***/
 	%include '/opt/sas/mcd_config/config/initialize_global.sas';
 	options casdatalimit=10G;
@@ -35,23 +34,27 @@
 	
 	
 	/*** 2. Получение информации из промо тула ***/
-	%include '/opt/sas/mcd_config/macro/step/add_promotool_marks2.sas';
+	*%include '/opt/sas/mcd_config/macro/step/add_promotool_marks2.sas';
 	%add_promotool_marks2(
 		mpOutCaslib=casuser,
 		mpPtCaslib=pt,
 		PromoCalculationRk=&PromoCalculationRk.
-	)
+	);
 	
-	/* Выделим только будущие промо акции */
 	proc fedsql sessref=casauto;
-		create table casuser.future_promo{options replace=true} as
+		create table casuser.promo_tool_promo{options replace=true} as
 			select
 				*
 			from
 				casuser.promo_enh
-			where
-				channel_cd = 'ALL' and
-				start_dt >= &ETL_CURRENT_DT_DB.
+			where (
+				year(start_dt) = year(&ETL_CURRENT_DT_DB) or
+				year(end_dt) = year(&ETL_CURRENT_DT_DB) or
+				(
+					year(start_dt) < year(&ETL_CURRENT_DT_DB) and
+					year(end_dt) > year(&ETL_CURRENT_DT_DB)
+				)
+			) and channel_cd = 'ALL'
 		;
 	quit;
 	
@@ -60,7 +63,7 @@
 	%include '/opt/sas/mcd_config/macro/step/pt/promo_effectiveness_model_scoring.sas';
 	%scoring_building(
 		promo_lib = casuser, 
-		ia_promo = future_promo,
+		ia_promo = promo_tool_promo,
 		ia_promo_x_pbo = promo_pbo_enh,
 		ia_promo_x_product = promo_prod_enh,
 		calendar_start = '01jan2017'd,
@@ -100,8 +103,9 @@
 		posterior_samples = nac.gc_out_train,
 		train_target_max = nac.receipt_qty_max
 	);
+
 	
-	/* Разложение UPT на промо компоненты */
+	/*** 5. Разложение UPT на промо компоненты ***/
 	%include '/opt/sas/mcd_config/macro/step/pt/upt_model_scoring.sas';
 	/* Собираем скоринговую витрину и выдаем прогноз (сохраняется на диск nac.upt_scoring + поднимается в касюзер (без промоута) в таблицу public.upt_scoring */
 	%upt_model_scoring(

@@ -149,62 +149,93 @@
 					;
 				QUIT;
 
-			/* MAIN CODE FOR EACH THREAD */
-			%MACRO THREAD_MAIN;
+				/* MAIN CODE FOR EACH THREAD */
+				%MACRO THREAD_MAIN;
+				
+					%DO ITER = 1 %TO &mvROW_CNT.;
+							/* GET PARAMETERS FROM BUFFER TABLE */
+							DATA WORK.GET_PARAMS_FOR_THREAD_ITER;
+								SET public.BUFFER_TABLE_&mvTHREAD_NUM.(FIRSTOBS = &ITER. OBS = &ITER.);
+								CALL SYMPUTX("i", i);
+							RUN;
+							%PUT &=i;
+						
+							%local lmvTabNmAbt lmvLibrefAbt;
+							%member_names (mpTable=&mpAbt, mpLibrefNameKey=lmvLibrefAbt, mpMemberNameKey=lmvTabNmAbt);
+
+							data _null_;
+								set models.&mpModelTable.(where=(n=&i.));
+								call symputx('filter', filter);
+								call symputx('model', model);
+								call symputx('params', params);
+								call symputx('interval', interval);
+								call symputx('nominal', nominal);
+								call symputx('train', train);
+							run;
+							
+							%tech_list_concat(mpVarBase=&NOMINAL, mpVarAdd=&promo_list_model, mpOutputVar=full_nominal);			
+							
+							%if &train. %then %do;
+								proc casutil;
+									*droptable casdata="&mpPrefix._&i." quiet;
+									droptable incaslib="Models" casdata="&model." quiet;
+									droptable incaslib="casuser" casdata="input_forest_data" quiet;
+								run;
+								
+								data casuser.input_forest_data(replace=yes);
+									set &lmvLibrefAbt..&lmvTabNmAbt.(where=(&filter.));
+								run;
+								
+								proc fedsql SESSREF=T_&mvTHREAD_NUM. noprint;
+									create table casuser.sys_tbl_cnt{options replace=true} as
+									select count(*) as cnt
+									from casuser.input_forest_data
+									;
+								quit;
+
+								proc sql noprint;
+									select cnt into :mvCNT
+									from casuser.sys_tbl_cnt
+									;
+								quit;
+								
+								%put &=mvCNT;
+								
+								%if &mvCNT > 0 %then %do;			
+									proc forest data=casuser.input_forest_data
+									  &params.;
+									
+									  target &mpTarget. / level=interval;
+									
+									  input &interval. / level=interval;
+									  input &full_nominal. / level=nominal;
+									  grow VARIANCE;
+									  id &mpId.;
+									  savestate rstore=models.&model.;
+									run;
+									proc casutil incaslib="Models" outcaslib="Models";
+										promote casdata="&model.";
+									run;
+								%end;
+								%else %do;
+									%put WARNING: There are no data for &filter.;
+								%end;
+							%end;
+							
+								%if &SYSCC gt 4 %then %do;
+									/* Return session in execution mode */
+									%put "ERROR: Error in train process";
+									%abort;
+								%end;
+
+					%END;
+
+				%MEND THREAD_MAIN;
+
+				%THREAD_MAIN;
 			
-				%DO ITER = 1 %TO &mvROW_CNT.;
-						/* GET PARAMETERS FROM BUFFER TABLE */
-						DATA WORK.GET_PARAMS_FOR_THREAD_ITER;
-							SET public.BUFFER_TABLE_&mvTHREAD_NUM.(FIRSTOBS = &ITER. OBS = &ITER.);
-							CALL SYMPUTX("i", i);
-						RUN;
-						%PUT &=i;
-					
-						%local lmvTabNmAbt lmvLibrefAbt;
-						%member_names (mpTable=&mpAbt, mpLibrefNameKey=lmvLibrefAbt, mpMemberNameKey=lmvTabNmAbt);
-
-						data _null_;
-							set models.&mpModelTable.(where=(n=&i.));
-							call symputx('filter', filter);
-							call symputx('model', model);
-							call symputx('params', params);
-							call symputx('interval', interval);
-							call symputx('nominal', nominal);
-							call symputx('train', train);
-						run;
-						
-						%tech_list_concat(mpVarBase=&NOMINAL, mpVarAdd=&promo_list_model, mpOutputVar=full_nominal);			
-						
-						%if &train. %then %do;
-							proc casutil incaslib="Models" outcaslib="Models";
-								*droptable casdata="&mpPrefix._&i." quiet;
-								droptable casdata="&model." quiet;
-							run;
-							
-							proc forest data=&lmvLibrefAbt..&lmvTabNmAbt.(where=(&filter.))
-							  &params.;
-							
-							  target &mpTarget. / level=interval;
-							
-							  input &interval. / level=interval;
-							  input &full_nominal. / level=nominal;
-							  grow VARIANCE;
-							  id &mpId.;
-							  savestate rstore=models.&model.;
-							run;
-							proc casutil incaslib="Models" outcaslib="Models";
-								promote casdata="&model.";
-							run;
-						%end;
-
-				%END;
-
-				%tech_redirect_log(mpMode=END, mpJobName=train_thread_&mvTHREAD_NUM., mpArea=Main);
-
-			%MEND THREAD_MAIN;
-
-			%THREAD_MAIN;
-
+			%tech_redirect_log(mpMode=END, mpJobName=train_thread_&mvTHREAD_NUM., mpArea=Main);
+			
 			ENDRSUBMIT;
 			
 		%END;	

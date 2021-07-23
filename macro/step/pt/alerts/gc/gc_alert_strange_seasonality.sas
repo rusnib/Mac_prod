@@ -125,7 +125,7 @@
 		left join casuser.pbo_dictionary as loc
 			on main.pbo_location_id = loc.pbo_location_id
 		where 
-			main.sales_dt < &mpBorderDt.
+			main.sales_dt < cast(&mpBorderDt. as date)
 		group by 
 			  main.channel_cd		
 			, loc.&mpLocLvl.

@@ -1,4 +1,4 @@
-%macro price_load_data;
+%macro price_load_data(mpPromoCalcRk=);
     %local lmvInLib
            lmvReportDt
            lmvReportDttm
@@ -33,7 +33,11 @@
 
     /* Подготовка входных данных */
     %add_promotool_marks2(mpOutCaslib=casuser,
-                            mpPtCaslib=pt);
+                            mpPtCaslib=pt
+							%if %length(&mpPromoCalcRk.) > 0 %then %do;
+								,PromoCalculationRk=&mpPromoCalcRk.
+							%end;
+							);
 
 
     data CASUSER.promo (replace=yes);

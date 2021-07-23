@@ -13,7 +13,7 @@
 		%end;
 
 		data _null_;
-			set models.PMIX_MODEL_TABLE nobs=nobs;
+			set models.&mpModelTable. nobs=nobs;
 			call symputx('length', nobs, 'G');
 			stop;
 		run;
@@ -140,30 +140,56 @@
 									set &lmvLibrefAbt..&lmvTabNmAbt.(where=(&filter.));
 								run;
 								
-								proc astore;
-								  score data=casuser.scoring
-								  rstore=models.&model.
-								  out=casuser.mltfc_&lmvTabNmAbt.&i. copyvars=(channel_cd prod_lvl4_id &mpId.);
+								proc fedsql SESSREF=T_&mvTHREAD_NUM. noprint;
+									create table casuser.sys_tbl_cnt{options replace=true} as
+									select count(*) as cnt
+									from casuser.scoring
+									;
+								quit;
+
+								proc sql noprint;
+									select cnt into :mvCNT
+									from casuser.sys_tbl_cnt
+									;
 								quit;
 								
-								/* promote to public for additional calcs */
-								proc casutil;  
-									promote casdata="mltfc_&lmvTabNmAbt.&i." casout="mltfc_&lmvTabNmAbt&i." incaslib="casuser" outcaslib="public";
-								run;
+								%put &=mvCNT;
+								
+								%if &mvCNT > 0 %then %do;
+								
+									proc astore;
+									  score data=casuser.scoring
+									  rstore=models.&model.
+									  out=casuser.mltfc_&lmvTabNmAbt.&i. copyvars=(channel_cd prod_lvl4_id &mpId.);
+									quit;
+									
+									/* promote to public for additional calcs */
+									proc casutil;  
+										promote casdata="mltfc_&lmvTabNmAbt.&i." casout="mltfc_&lmvTabNmAbt&i." incaslib="casuser" outcaslib="public";
+									run;
+								%end;
+								%else %do;
+									%put WARNING: There are no input data for &filter.;
+								%end;
 							%end; 
 							
 					/*	%mend m_rtp_train;
 						%m_rtp_train; */
 					%END;
 
-				%tech_redirect_log(mpMode=END, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
-				/* PROC PRINTTO;
-				RUN; */
+			
 				
 				%MEND THREAD_MAIN;
 
 				%THREAD_MAIN;
-
+				
+				%tech_redirect_log(mpMode=END, mpJobName=log_of_thread_&mvTHREAD_NUM., mpArea=Main);
+				%if &SYSCC gt 4 %then %do;
+					/* Return session in execution mode */
+					%put "ERROR: Error in train process";
+					%abort;
+				%end;
+				
 				ENDRSUBMIT;
 					
 			%END;	

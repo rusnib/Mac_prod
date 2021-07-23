@@ -14,6 +14,9 @@
 							mpOutNnetWp=casuser.nnet_wp1,
 							mpPrmt=Y,
 							mpInLibref=&lmvInLibref.,
+							mpInPboTable=MN_DICT.PBO_FORECAST_RESTORED,
+							mpInGCTable=MN_DICT.GC_FORECAST_RESTORED,
+							mpInPrices=MN_DICT.PRICE_FULL_SKU_PBO_DAY,
 							mpAuth = NO);
 
 	%if %sysfunc(sessfound(casauto))=0 %then %do;
@@ -21,8 +24,16 @@
 		caslib _all_ assign;
 	%end;
 	
-	%let pbo_table  = MN_DICT.PBO_FORECAST_RESTORED;
-	%let gc_table   = MN_DICT.GC_FORECAST_RESTORED;
+	%local
+		lmvPboTable
+		lmvGCTable
+		lmvInPrices
+		;
+	
+	%let lmvPboTable = %upcase(&mpInPboTable.);
+	%let lmvGCTable = %upcase(&mpInGCTable.);
+	%let lmvInPrices = %upcase(&mpInPrices.);
+	
 	
 	proc cas;
 		table.tableExists result = rc / caslib="mn_dict" name="NNET_WP1";
@@ -628,7 +639,7 @@
 			from
 				casuser.percent as pct
 			left join 
-				&pbo_table. as vf
+				&lmvPboTable. as vf
 			on         pct.pbo_location_id = vf.pbo_location_id 
 				and pct.period_dt         = vf.sales_dt
 				and pct.channel_cd        = vf.channel_cd
@@ -657,7 +668,7 @@
 				coalesce(t1.channel_cd,t2.channel_cd) as channel_cd,
 				coalesce(t1.pbo_location_id,t2.PBO_LOCATION_ID) as PBO_LOCATION_ID, 
 				coalesce(t1.ff,t2.gc_fcst) as ff
-			from casuser.daily_gc t1 full outer join &gc_table. t2
+			from casuser.daily_gc t1 full outer join &lmvGCTable. t2
 				on t1.period_dt =t2.sales_dt and 
 				t1.channel_cd=t2.channel_cd and t1.pbo_location_id=t2.pbo_location_id
 	;
@@ -682,154 +693,7 @@
 			save incaslib="mn_short" outcaslib="mn_short" casdata="days_pbo_close" casout="days_pbo_close.sashdat" replace;
 	run;
 	quit;
-	
-	/*3. ���������� ��� �� �������*/
-	/* Подготовка регулярных цен в разрезе SKU-ПБО-день */
-	data casuser.price_reg_past;
-		set MN_DICT.PRICE_REGULAR_PAST;
-		retain _past 1;
-		if start_dt ne . and end_dt ne . then
-		do period_dt=max(start_dt,&VF_HIST_START_DT_SAS) to min(end_dt,&VF_FC_AGG_END_DT_SAS);
-		output;
-		end;
-	run;
-	data casuser.price_reg_future;
-		set MN_DICT.PRICE_REGULAR_FUTURE;
-		retain _past 0;
-		if start_dt ne . and end_dt ne . then
-		do period_dt=max(start_dt,&VF_HIST_START_DT_SAS) to min(end_dt,&VF_FC_AGG_END_DT_SAS);
-		output;
-		end;
-	run;
 
-	data casuser.prices_flat1;
-		format period_dt date9. product_id pbo_location_id 32.;
-		set casuser.price_reg_past casuser.price_reg_future;
-		by product_id pbo_location_id period_dt _past;
-		if first.period_dt then output;
-	run;
-
-	proc casutil;
-		droptable casdata="price_reg_past" incaslib="casuser" quiet;
-		droptable casdata="price_reg_future" incaslib="casuser" quiet;
-	run;
-
-	/* Подготовка промо-цен в разрезе ID_промо-SKU-ПБО-день */
-	data casuser.price_promo_past;
-		set MN_DICT.PRICE_promo_past;
-		drop channel_cd;
-		retain _past 1;
-		if start_dt ne . and end_dt ne . and upcase(channel_cd)='ALL' then
-		do period_dt=max(start_dt,&VF_HIST_START_DT_SAS) to min(end_dt,&VF_FC_AGG_END_DT_SAS);
-		output;
-		end;
-	run;
-
-	data casuser.price_promo_future;
-		set MN_DICT.PRICE_promo_future;
-		drop channel_cd;
-		retain _past 0;
-		if start_dt ne . and end_dt ne . and upcase(channel_cd)='ALL' then
-		do period_dt=max(start_dt,&VF_HIST_START_DT_SAS) to min(end_dt,&VF_FC_AGG_END_DT_SAS);
-		output;
-		end;
-	run;
-
-	data casuser.prices_flat2;
-		format period_dt date9. product_id pbo_location_id 32.;
-		set casuser.price_promo_past casuser.price_promo_future;
-		by product_id pbo_location_id promo_id period_dt _past;
-		if first.period_dt then output;
-	run;
-
-	proc casutil;
-		droptable casdata="PRICE_promo_past" incaslib="casuser" quiet;
-		droptable casdata="price_promo_future" incaslib="casuser" quiet;
-	run;
-
-	/* Агрегация промо-цен до SKU-ПБО-день,
-		то есть устранение разреза ID_промо */
-	proc fedsql sessref=casauto;
-		create table casuser.prices_flat2_nopromo{options replace=true} as
-		select period_dt, product_id, pbo_location_id,
-			avg(GROSS_PRICE_AMT) as A_GROSS_PRICE_AMT,
-			avg(NET_PRICE_AMT) as A_NET_PRICE_AMT,
-			min(GROSS_PRICE_AMT) as M_GROSS_PRICE_AMT,
-			min(NET_PRICE_AMT) as M_NET_PRICE_AMT,
-			count(*) as promo_ct
-		from casuser.prices_flat2
-		group by 1,2,3
-	;
-	quit;
-
-	proc casutil;
-		droptable casdata="PRICES_flat2" incaslib="casuser" quiet;
-	run;
-
-	/* Объединение промо- и регулярных цен, расчет скидок */
-	data casuser.price_feat;
-		merge 
-			casuser.prices_flat1 (
-				rename=( 
-					net_price_amt = price_reg_net 			
-					gross_price_amt = price_reg_gross
-					)
-				) 
-			casuser.prices_flat2_nopromo (
-				rename=( 
-					M_GROSS_PRICE_AMT = price_promo_gross 	
-					M_NET_PRICE_AMT = price_promo_net
-					)
-				)
-			;
-		by 
-			product_id 
-			pbo_location_id 
-			period_dt
-			;
-		keep 
-			product_id 
-			pbo_location_id 
-			period_dt 
-			price_reg_gross 
-			price_promo_gross
-			discount_gross_rur 
-			discount_gross_pct 
-			price_reg_net
-			price_promo_net
-			discount_net_rur 
-			discount_net_pct 
-			promo_ct 
-			price_gross
-			price_net
-			;
-		/* GROSS-prices */
-		if price_promo_gross>0 then do;
-			price_gross			= price_promo_gross ;
-			discount_gross_rur	= max(0, price_reg_gross - price_promo_gross);
-			discount_gross_pct 	= divide(discount_gross_rur, price_reg_gross);
-		end;
-		else do;
-			price_gross			= price_reg_gross;
-			discount_gross_rur	= 0;
-			discount_gross_pct	= 0;
-		end;
-		/* NET-prices */
-		if price_promo_net>0 then do;
-			price_net			= price_promo_net ;
-			discount_net_rur	= max(0, price_reg_net - price_promo_net);
-			discount_net_pct	= divide(discount_net_rur, price_reg_net);
-		end;
-		else do;
-			price_net			= price_reg_net;
-			discount_net_rur	= 0;
-			discount_net_pct	= 0;
-		end;
-		promo_ct = coalesce(promo_ct,0);
-	run;
-	
-	
-	
 	%if &mpPrmt. = Y %then %do;
 		proc casutil;
 		droptable casdata="&lmvOutTabNameGcSt." incaslib="&lmvOutLibrefGcSt." quiet;
@@ -839,8 +703,6 @@
 	%end;
 
 	proc casutil;
-		save incaslib="casuser" outcaslib="mn_short" casdata="price_feat" casout="price_feat.sashdat" replace;
-		
 		save incaslib="casuser" outcaslib="mn_short" casdata="fc_w_plm" casout="fc_w_plm.sashdat" replace;
 		
 		save incaslib="casuser" outcaslib="mn_short" casdata="fc_w_plm_gc" casout="fc_w_plm_gc.sashdat" replace;
@@ -851,6 +713,19 @@
 	
 /*4. ������������ ������ �� ����*/
 /*4.1 Units*/
+	%local	
+		lmvInPricesTb
+		lmvInPricesLib
+		;
+		
+	%let lmvInPricesLib = %scan(&lmvInPrices., 1, %str(.));
+	%let lmvInPricesTb = %scan(&lmvInPrices., 2, %str(.));
+
+	proc casutil;
+		droptable casdata="&lmvInPricesTb." incaslib="&lmvInPricesLib." quiet;
+		load casdata="&lmvInPricesTb..sashdat" incaslib="&lmvInPricesLib." casout="&lmvInPricesTb." outcaslib="&lmvInPricesLib.";
+	quit;
+	
 	proc fedsql sessref=casauto;
 	create table &lmvOutLibrefPmixSt..&lmvOutTabNamePmixSt.{options replace=true} as
 		select distinct
@@ -877,7 +752,8 @@
 			t1.ff*t2.price_net as OVERRIDED_FCST_SALE /*� ������� � ������ �������� ��� (��������� � ETL ����� ��������� ������� ���� �� ������� � ������ ����������).*/,
 			t2.price_net as AVG_PRICE /*� ������� ����. ��������� � ETL ��� ��������� ������� � ���/������� � �� � ������� ���/���*/
 			from casuser.fcst_reconciled t1 
-			left join casuser.price_feat t2 
+			/*left join casuser.price_feat t2 */
+			left join &lmvInPrices. t2 
 				on  t1.product_id		= t2.product_id 
 				and t1.pbo_location_id	= t2.pbo_location_id 
 				and t1.period_dt		= t2.period_dt
@@ -982,13 +858,19 @@
 			case when abs(sum(t1.ff))>1e-5 then sum(t1.ff*t2.price_net)/sum(t1.ff) else 0 end
 			   as AVG_PRICE /*� ������� ����. ��������� � ETL ��� ��������� ������� � ���/������� � �� � ������� ���/���*/
 			from casuser.fcst_reconciled t1 
-			left join casuser.price_feat t2 
+			/*left join casuser.price_feat t2 */
+			left join &lmvInPrices. t2 
 				on  t1.product_id		= t2.product_id 
 				and t1.pbo_location_id	= t2.pbo_location_id 
 				and t1.period_dt		= t2.period_dt
 			where t1.channel_cd='ALL' 
 				group by 1,2,3,4;
 	quit;
+	
+	proc casutil;
+		droptable casdata="&lmvInPricesTb." incaslib="&lmvInPricesLib." quiet;
+	quit;
+	
 /*5.2 GC*/
 	proc fedsql sessref=casauto;
 		create table &lmvOutLibrefGcLt..&lmvOutTabNameGcLt.{options replace=true} as

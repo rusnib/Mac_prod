@@ -252,7 +252,7 @@
 
 	/* Умножаем на нормировку */
 	proc sql;
-		create table &out. as
+		create table work.scoring3 as
 			select
 				t1.promo_id,
 				t1.pbo_location_id,
@@ -268,6 +268,33 @@
 				&train_target_max. as t2
 			on
 				t1.pbo_location_id = t2.pbo_location_id
+		;
+	quit;
+
+	/* Убираем уже закрытые рестораны */
+	proc sql;
+		create table &out. as 
+			select
+				t1.*
+			from
+				work.scoring3 as t1
+			left join (
+				select
+					pbo_location_id,
+					input(pbo_loc_attr_value, ddmmyy10.) as close_date format date9.
+				from
+					etl_ia.pbo_loc_attributes
+				where
+					&ETL_CURRENT_DTTM. <= valid_to_dttm and
+					&ETL_CURRENT_DTTM. >= valid_from_dttm and
+					pbo_loc_attr_nm = 'CLOSE_DATE' and
+					pbo_loc_attr_value is not missing
+			) as t2
+			on
+				t1.pbo_location_id = t2.pbo_location_id
+			where
+				(t2.close_date > &ETL_CURRENT_DT.) or 
+				(t2.close_date is missing)
 		;
 	quit;
 

@@ -6,7 +6,6 @@ mpBorderDt 			 	дата в виде числа 22646, любая функция
 mpAlertCriterionDamp 	интервал от 0 до 1, исключая границы 
 mpAlertCriterionGrowth 	интервал от 0 до 1, исключая границы 
 mpOutTableNm 			имя таблицы, например, GC_ALERT_YEAR_TREND
-
 */
 
 
@@ -191,11 +190,12 @@ mpOutTableNm 			имя таблицы, например, GC_ALERT_YEAR_TREND
 			, apndx.sum_predict as sum_appendix_predict_year
 			, sum(hist.sum_actual_prevyear, apndx.sum_predict) as sum_actual_n_appendix_prevyear
 
-			, (fcst.sum_predict_year - sum(hist.sum_actual_prevyear, apndx.sum_predict)) / sum(hist.sum_actual_prevyear, apndx.sum_predict) 	
+			, divide( (fcst.sum_predict_year - sum(hist.sum_actual_prevyear, apndx.sum_predict)) ,
+			 sum(hist.sum_actual_prevyear, apndx.sum_predict) 	)
 					as rel_change_to_prevyear
-			, (fcst.sum_predict_year - hist2.sum_actual_prevyear2) / hist2.sum_actual_prevyear2		
+			, divide((fcst.sum_predict_year - hist2.sum_actual_prevyear2) , hist2.sum_actual_prevyear2 )		
 					as rel_change_to_prevyear2
-			, (fcst.sum_predict_year - avghist.avg_actual_allhist) / avghist.avg_actual_allhist
+			, divide((fcst.sum_predict_year - avghist.avg_actual_allhist) , avghist.avg_actual_allhist )
 					as rel_change_to_avghist
 
 		from 

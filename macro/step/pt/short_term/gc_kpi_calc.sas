@@ -27,8 +27,8 @@ options casdatalimit=600000M;
 %let lmvStartDate 	= '01JAN2021'd;
 %let lmvEndDate 	= '31JAN2021'd;
 
-%let lmvTableFcstGc = MAX_CASL.GC_FORECAST_RESTORED_JAN_2_H90;
-%let lmvOutTablePostfix = JAN_2_H90;
+%let lmvTableFcstGc = MAX_CASL.GC_FORECAST_RESTORED_JAN_2;
+%let lmvOutTablePostfix = JAN;
 
 
 /* Неизменяемые параметры */
@@ -348,32 +348,14 @@ data WORK.KPI_WEEK_&lmvOutTablePostfix.;
 run;
 
 
-/* 
-%let common_path = /opt/sas/mcd_config/macro/step/pt/alerts;
+%let common_path = /opt/sas/mcd_config/macro/step/pt/short_term;
 
+ods excel file="&common_path./KPI_GC_&lmvOutTablePostfix..xlsx"  style=statistical;
 
+ods excel options(sheet_interval = 'none' sheet_name = "KPI_GC_WEEK"	);
+proc print data = WORK.KPI_WEEK_&lmvOutTablePostfix. 	label; run;
 
-ods excel file="&common_path./GC_ALERTS.xlsx"  style=statistical;
-
-ods excel options(sheet_interval = 'none' sheet_name = "Год-год, Регион, Тек.дата"	);
-proc print data = WORK.GC_YEAR_TREND_REGION_CURRDT 	label; run;
-
-ods excel options(sheet_interval = 'proc' sheet_name = "Год-год, Регион, След.кал.год"	);
-proc print data = DM_ALERT.GC_YEAR_TREND_REGION_CALYEAR	label; run;
-
-ods excel options(sheet_interval = 'proc' sheet_name = "Год-год, Город, Тек.дата"	);
-proc print data = DM_ALERT.GC_YEAR_TREND_CITY_CURRDT 	label; run;
-
-ods excel options(sheet_interval = 'proc' sheet_name = "Год-год, Город, След.кал.год"	);
-proc print data = DM_ALERT.GC_YEAR_TREND_CITY_CALYEAR 	label; run;
-
-ods excel options(sheet_interval = 'proc' sheet_name = "Месяц-Месяц, Регион"	);
-proc print data = DM_ALERT.GC_MTH_CHANGE_REGION_CURRDT	label; run;
-
-ods excel options(sheet_interval = 'proc' sheet_name = "Месяц-Месяц, Город"	);
-proc print data = DM_ALERT.GC_MTH_CHANGE_CITY_CURRDT 	label; run;
-
-ods excel options(sheet_interval = 'proc' sheet_name = "Неестеств.знач., ПБО-Месяц"	);
-proc print data = DM_ALERT.GC_ODDLY_VALUE_PBO_MTH 	label; run;
+ods excel options(sheet_interval = 'proc' sheet_name = "KPI_GC_MONTH"	);
+proc print data = WORK.KPI_MONTH_&lmvOutTablePostfix.	label; run;
 
 ods excel close;

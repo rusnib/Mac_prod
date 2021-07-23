@@ -1,55 +1,9 @@
-/*****************************************************************
-*  ВЕРСИЯ:
-*   $Id: 
-*
-******************************************************************
-*  НАЗНАЧЕНИЕ:
-*   Реализация алгоритма вычисления промо-цен на будущее из таблиц промо-тула согласно п.4 постановки McD_price_calculation_v6.
-*
-*  ПАРАМЕТРЫ:
-*   mpPromoTable             - Наименование входящего справочника с промо разметкой
-*   mpPromoPboTable 	 	 - Наименование входящего справочника с промо-пбо разметкой
-*   mpPromoProdTable   	     - Наименование входящего справочника с промо-скю разметкой
-*   mpPriceRegFutTable 	     - Наименование входящей таблицы с регулярными ценами на будущее
-*   mpVatTable               - Наименование входящего справочника НДС
-*   mpLBPTable               - Наименование входящего справочника Local Based Pricing
-*   mpPboLocAttributes       - Наименование входящего справочника с атрибутами пбо
-*   mpProductAttrTable       - Наименование входящего справочника с атрибутами скю
-*   mpPriceIncreaseTable     - Наименование входящего справочника с плановым повышением цен
-*   mpOutTable               - Наименование выходящей таблицы с рассчитанными промо-ценами на будущее
-*
-******************************************************************
-*  Использует: 
-*	нет
-*
-*  Устанавливает макропеременные:
-*   нет
-*
-******************************************************************
-*  Пример использования:
-*
-    mpPromoTable         	= CASUSER.PROMO_ENH
-    , mpPromoPboTable 	 	= CASUSER.PROMO_PBO_ENH_UNFOLD
-    , mpPromoProdTable   	= CASUSER.PROMO_PROD_ENH
-    , mpPriceRegFutTable 	= DM_ABT.PRICE_REGULAR_FUTURE
-    , mpVatTable		 	= CASUSER.VAT
-    , mpLBPTable		 	= CASUSER.LBP
-    , mpPboLocAttributes	= CASUSER.PBO_LOC_ATTRIBUTES
-    , mpProductAttrTable    = CASUSER.PRODUCT_ATTRIBUTES
-    , mpPriceIncreaseTable 	= CASUSER.PRICE_INCREASE
-    , mpOutTable	  	 	= CASUSER.PRICE_PROMO_FUTURE
-	, mpPromoClRk			= 
-    );
-*
-****************************************************************************
-*  30-04-2021 		Мугтасимов Данил 		Начальное кодирование
-*  25-06-2021		Borzunov Nikita			Additional param mpPromoClRk for Promo Tool View process (default value = NULL)
-****************************************************************************/
+
 %macro price_promo_future(
     mpPromoTable         	= CASUSER.PROMO_ENH
     , mpPromoPboTable 	 	= CASUSER.PROMO_PBO_ENH_UNFOLD
     , mpPromoProdTable   	= CASUSER.PROMO_PROD_ENH
-    , mpPriceRegFutTable 	= DM_ABT.PRICE_REGULAR_FUTURE /*should be parameterized on the output table of reg future macro */
+    , mpPriceRegFutTable 	= DM_ABT.PRICE_REGULAR_FUTURE
     , mpVatTable		 	= CASUSER.VAT
     , mpLBPTable		 	= CASUSER.LBP
     , mpPboLocAttributes	= CASUSER.PBO_LOC_ATTRIBUTES
@@ -255,8 +209,8 @@
                 , t1.PBO_LOCATION_ID
                 , t1.START_DT as START_DT_PRICE
                 , t1.END_DT as END_DT_PRICE
-                , t3.START_DT as START_DT_INC
-                , t3.END_DT as END_DT_INC
+                , max(t3.START_DT, &VF_FC_START_DT_SAS.) as START_DT_INC
+                , min(t3.END_DT, &VF_FC_AGG_END_DT_SAS.) as END_DT_INC
                 , coalesce(t2.PBO_LOC_ATTR_VALUE, 'Price Regular') as PBO_LOC_ATTR_VALUE
                 , t3.PERCENT_INCREASE
                 , case 
@@ -284,7 +238,7 @@
     quit;
 
     data CASUSER.NPPROMOSUP_OUT(keep=CHANNEL_CD PROMO_ID PRODUCT_ID PBO_LOCATION_ID START_DT END_DT GROSS_PRICE_AMT);
-        format START_DT date9. END_DT date9.;
+        format START_DT END_DT date9.;
         set CASUSER.UNION_MECHANICS_3;
         
         if INTERSECT_TYPE = 1 then do;
@@ -567,13 +521,13 @@
     */
     proc fedsql sessref=casauto noprint;
         create table CASUSER.UNION_MECHANICS_1{options replace=true} as
-            select t1.CHANNEL_CD
-                , t1.PROMO_ID
-                , t1.PRODUCT_ID
-                , t1.PBO_LOCATION_ID
+            select t2.CHANNEL_CD
+                , t2.PROMO_ID
+                , t2.PRODUCT_ID
+                , t2.PBO_LOCATION_ID
                 , t2.START_DT as START_DT_PRICE
                 , t2.END_DT as END_DT_PRICE
-                , t1.GROSS_PRICE_AMT
+                , t2.GROSS_PRICE_AMT
                 , t3.START_DT as START_DT_VAT
                 , t3.END_DT as END_DT_VAT
                 , t3.VAT
@@ -583,16 +537,16 @@
                         when (t3.START_DT between t2.START_DT and t2.END_DT) and (t3.END_DT between t2.START_DT and t2.END_DT) then 3
                         when (t3.END_DT > t2.END_DT) and (t3.START_DT between t2.START_DT and t2.END_DT) then 4
                     end as INTERSECT_TYPE
-            from CASUSER.UNION_MECHANICS t1
+            from CASUSER.UNION_MECHANICS t2/*t1*/
 
-            left join CASUSER.PROMO_FILT_SKU_PBO t2
+/*            left join CASUSER.PROMO_FILT_SKU_PBO t2
                 on  t1.PROMO_ID = t2.PROMO_ID
                     and t1.PRODUCT_ID = t2.PRODUCT_ID
-                    and t1.PBO_LOCATION_ID = t2.PBO_LOCATION_ID
+                    and t1.PBO_LOCATION_ID = t2.PBO_LOCATION_ID commented by Danil M 02JUL2021*/
 
             left join &mpVatTable t3
-                on  t1.PRODUCT_ID = t3.PRODUCT_ID
-                    and t1.PBO_LOCATION_ID = t3.PBO_LOCATION_ID
+                on  t2.PRODUCT_ID = t3.PRODUCT_ID
+                    and t2.PBO_LOCATION_ID = t3.PBO_LOCATION_ID
                     and ( ( (t2.START_DT between t3.START_DT and t3.END_DT) and (t2.END_DT between t3.START_DT and t3.END_DT) )
                     or ( (t3.START_DT < t2.START_DT) and (t3.END_DT between t2.START_DT and t2.END_DT) )
                     or ( (t3.START_DT between t2.START_DT and t2.END_DT) and (t3.END_DT between t2.START_DT and t2.END_DT) )
@@ -633,7 +587,7 @@
         promote casdata="&lmvOutTableName" incaslib="CASUSER" outcaslib="&lmvOutTableCLib";
 		save incaslib="&lmvOutTableCLib." outcaslib="&lmvOutTableCLib." casdata="&lmvOutTableName." casout="&lmvOutTableName..sashdat" replace; 
     run;
-    
+
 	proc casutil;
         droptable casdata="PROMO_FILT_SKU_PBO" incaslib="CASUSER" quiet;
         droptable casdata="NPPROMOSUP_OUT" incaslib="CASUSER" quiet;

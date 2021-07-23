@@ -133,7 +133,7 @@
 		filename resp temp ;
 		proc http 
 			 method="POST"
-			  url="https://api.telegram.org/bot1819897875:AAFYeGThLwMPmc81964-BdyFWOErzq0waX0/sendMessage?chat_id=-1001360913796&text=&mvTGMessage."
+			  url="https://api.telegram.org/bot&TG_BOT_TOKEN./sendMessage?chat_id=-1001360913796&text=&mvTGMessage."
 			 ct="application/json"
 			 out=resp; 
 		run;
