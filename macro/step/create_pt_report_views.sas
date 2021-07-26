@@ -3,8 +3,12 @@
 							   mpVAPTOut=,
 							   mpVAPTGCOut=,
 							   mpPromoClRk=);
-	cas casauto;
-	caslib _all_ assign;
+
+	%tech_cas_session(mpMode = start
+						,mpCasSessNm = casauto
+						,mpAssignFlg= y
+						,mpAuthinfoUsr=
+						);
 	
 	%local
 		lmvGCTable
@@ -16,7 +20,10 @@
 		lmvVAPTOutLib
 		lmvVAPTOutTable
 		lmvPromoClRk
+		lmvStartYearDB
 		;
+		
+	%let lmvStartYearDB = date%str(%')%sysfunc(putn(%sysfunc(intnx(year,%sysfunc(date()),0,b)),yymmdd10.))%str(%');
 	
 	%let lmvUPTTable = %upcase(&mpUPTTable.);
 	%let lmvGCTable  = %upcase(&mpGCTable.);
@@ -30,6 +37,23 @@
 	%let lmvVAPTGCOutTable = %scan(&lmvVAPTGCOut., 2, %str(.));
 	
 	%let lmvPromoClRk = &mpPromoClRk.;
+	
+	proc casutil;
+		load data=pt.promo_calculation casout='promo_calculation' outcaslib="casuser" replace;
+	quit;
+	
+	/*get p_cal_rk*/
+	proc fedsql sessref=casauto; 
+	  create table casuser.pcal{options replace=true} as
+	  select p_cal_rk
+	  from casuser.promo_calculation 
+		where promo_calculation_rk=%tslit(&lmvPromoClRk);
+	quit;
+	proc sql noprint;
+		select p_cal_rk into :mvPCalRk 
+		from casuser.pcal
+		;
+	quit;
 	
 	/* START Создание таблицы casuser.pbo_dictionary для доп.аттрибутов (Макопко/гид/рост и тд) */
 	proc casutil;
@@ -115,7 +139,7 @@
 	
 	
 	/* START Расчет новых промо-цен на будущее с учетом входного PromoCalculationRk */
-	%price_load_data;
+	%price_load_data(mpPromoCalcRk=&lmvPromoClRk.);
 	%price_promo_future( mpPromoTable         	= CASUSER.PROMO
 				, mpPromoPboTable 	 	= CASUSER.PROMO_PBO_UNFOLD
 				, mpPromoProdTable   	= CASUSER.PROMO_PROD
@@ -138,13 +162,13 @@
 		/* Удаление целевых таблиц */
 		droptable incaslib="casuser" casdata="report_data" quiet;
 		droptable incaslib="casuser" casdata="lvl_all_pbo" quiet;
-		droptable incaslib="casuser" casdata="UPT_SCORING" quiet;
-		droptable incaslib="casuser" casdata="GC_PREDICTION" quiet;
+		*droptable incaslib="casuser" casdata="UPT_SCORING" quiet;
+		*droptable incaslib="casuser" casdata="GC_PREDICTION" quiet;
 		droptable incaslib="casuser" casdata="INTERNAL_ORG" quiet;
 		/* Загрузка в память входных таблиц (GC | UPT после скоринга) и иерархии для пбо*/
 		load data=work.lvl_all outcaslib="casuser" casout="lvl_all_pbo" replace;
-		load data=&lmvUPTTable. outcaslib="casuser" casout="UPT_SCORING" replace;
-		load data=&lmvGCTable. outcaslib="casuser" casout="GC_PREDICTION" replace;
+		*load data=&lmvUPTTable. outcaslib="casuser" casout="UPT_SCORING" replace;
+		*load data=&lmvGCTable. outcaslib="casuser" casout="GC_PREDICTION" replace;
 		load data=PT.INTERNAL_ORG outcaslib="casuser" casout="INTERNAL_ORG" replace;
 	quit;
 
@@ -168,29 +192,30 @@
 					,t2.pbo_location_id_1 as PARENT_PBO_LOCATION_ID_1
 					,t2.pbo_location_id_2 as PARENT_PBO_LOCATION_ID_2
 					,t2.pbo_location_id_3 as PARENT_PBO_LOCATION_ID_3	
-					,coalesce(t4.a_agreement_type, t3.agreement_type) as agreement_type
-					,coalesce(t4.a_company, t3.company) as company
-			from casuser.GC_PREDICTION t1
+					,coalesce(t3.agreement_type, t4.a_agreement_type) as agreement_type
+					,coalesce(t3.company, t4.a_company) as company
+			/* from casuser.GC_PREDICTION t1 */
+			from &lmvGCTable. t1
 				left join CASUSER.lvl_all_pbo t2
 					on t2.pbo_location_id_4 = t1.PBO_LOCATION_ID
 				left join casuser.INTERNAL_ORG t3
 					on t3.member_rk = t1.PBO_LOCATION_ID
 				left join  casuser.pbo_dictionary t4
 					on t4.pbo_location_id = t1.pbo_location_id
+			where t1.sales_dt>=&lmvStartYearDB.
 		;
 	quit;
 	
 	data casuser.report_data_gc(replace=yes drop=agreement_type_old company_old);
 		set casuser.report_data_gc(rename=(agreement_type=agreement_type_old company=company_old));
-		length agreement_type $21
-			company $20;
-		agreement_type = substr(agreement_type_old,1,21);
-		company = substr(company_old,1,20);
-		PromoClRK = &lmvPromoClRk.;
+		length agreement_type company $10;
+		agreement_type = substr(agreement_type_old,1,10);
+		company = substr(company_old,1,10);
+		PromoClRK = &mvPCalRk.;
 	run;
 	
-	data casuser.UPT_SCORING(replace=yes);
-		set casuser.UPT_SCORING;
+	data &lmvUPTTable.(replace=yes);
+		set &lmvUPTTable.;
 		format pbo_location_id 8.;
 	run;
 	
@@ -214,10 +239,10 @@
 					,t4.product_id_2 as PARENT_PRODUCT_ID_2
 					,t4.product_id_3 as PARENT_PRODUCT_ID_3
 					,t4.product_id_4 as PARENT_PRODUCT_ID_4
-					,coalesce(t6.a_agreement_type, t5.agreement_type) as agreement_type
-					,coalesce(t6.a_company, t5.company) as company
-			from casuser.UPT_SCORING t1
-				left join casuser.GC_PREDICTION t2
+					,coalesce(t5.agreement_type, t6.a_agreement_type) as agreement_type
+					,coalesce(t5.company, t6.a_company) as company
+			from &lmvUPTTable. t1
+				left join &lmvGCTable. t2
 					on t1.PBO_LOCATION_ID=t2.PBO_LOCATION_ID
 					and t1.sales_dt = t2.sales_dt
 					and t1.promo_id = t2.promo_id
@@ -229,16 +254,16 @@
 					on t5.member_rk = t1.PBO_LOCATION_ID
 				left join  casuser.pbo_dictionary t6
 					on t6.pbo_location_id = t1.pbo_location_id
+			where t1.sales_dt>=&lmvStartYearDB.
 		;
 	quit;
 	
 	/* Укорачиваем длины полей символьных */
 	data casuser.report_data(replace=yes drop=agreement_type_old company_old);
 		set casuser.report_data(rename=(agreement_type=agreement_type_old company=company_old));
-		length agreement_type $21
-			   company $20;
-		agreement_type = substr(agreement_type_old,1,21);
-		company = substr(company_old,1,20);
+		length agreement_type company $15;
+		agreement_type = substr(agreement_type_old,1,15);
+		company = substr(company_old,1,15);
 	run;
 	
 	/* Определяем мин. и макс. даты в базовом отчете для последующей протяжки цен(промо- регулярные- косты-) на будущее*/
@@ -263,7 +288,7 @@
 			from MN_DICT.PRICE_REGULAR_FUTURE t1
 				inner join 
 						(select distinct PRODUCT_ID, PBO_LOCATION_ID
-						from casuser.UPT_SCORING ) t2
+						from &lmvUPTTable. ) t2
 					on t1.PRODUCT_ID = t2.product_id
 					and t1.PBO_LOCATION_ID = t2.PBO_LOCATION_ID
 					and t1.start_dt is not missing
@@ -313,7 +338,7 @@
 			from MN_DICT.PRICE_PROMO_FUTURE t1
 				inner join 
 						(select distinct PRODUCT_ID, PBO_LOCATION_ID
-						from casuser.UPT_SCORING ) t2
+						from &lmvUPTTable. ) t2
 					on t1.PRODUCT_ID = t2.product_id
 					and t1.PBO_LOCATION_ID = t2.PBO_LOCATION_ID
 					and t1.start_dt is not missing
@@ -396,7 +421,7 @@
 			from casuser.cost_price t1
 				inner join 
 						(select distinct PRODUCT_ID, PBO_LOCATION_ID
-						from casuser.UPT_SCORING ) t2
+						from &lmvUPTTable. ) t2
 					on t1.PRODUCT_ID = t2.product_id
 					and t1.PBO_LOCATION_ID = t2.PBO_LOCATION_ID
 			group by t1.product_id
@@ -410,6 +435,7 @@
 
 	proc casutil; 
 		droptable incaslib="casuser" casdata="cost_price" quiet; 
+	run;
 	quit; 
 
 	/* Растягиваем интервалы до максимальной даты отчета */
@@ -430,14 +456,14 @@
 		select   t1.*
 				,(coalesce(t2.food_cost_amt,0) + coalesce(t2.non_product_cost_amt,0) + coalesce(t2.paper_cost_amt,0)) as cost
 				,case when lowcase(AGREEMENT_TYPE) ='mcopco' then 0.3
-					  when lowcase(AGREEMENT_TYPE) = 'developmental license' then
+					  when lowcase(AGREEMENT_TYPE) = 'developmental licensee' then
 						case when lowcase(company)  = 'ooo spp' then 0.35
 							when lowcase(company)  = 'ooo razvitie rost' then 0.415 
 							when lowcase(company)  = 'ooo gid' then 0.31
 						end
 				      else 0.25
 				end as AGREEMENT_TYPE_PCT
-				,&lmvPromoClRk. as PromoClRK
+				,&mvPCalRk. as PromoClRK
 		from casuser.report_data_prices t1
 			left join casuser.cost_price_todate t2
 				on  t1.PRODUCT_ID = t2.product_id
@@ -449,6 +475,7 @@
 	proc casutil; 
 		droptable incaslib="casuser" casdata="cost_price_todate" quiet; 
 		droptable incaslib="casuser" casdata="cost_price_extr" quiet; 
+	run;
 	quit; 
 
 	data casuser.product;
@@ -475,8 +502,9 @@
 			output;
 		end;
 		
-		set CASUSER.PROMO_ENH;
-		START = PROMO_ID;
+		/*set CASUSER.PROMO_ENH;*/
+		set casuser.pt_act_promo_list;
+		START = PROMO_ID_GEN;
 		LABEL = PROMO_NM;
 		Fmtname= 'promo_name_fmt';
 		Type = 'n';
@@ -521,11 +549,12 @@
 	cas casauto promotefmtlib fmtlibname=FMTDICT replace;
 
 	proc casutil;
-		droptable incaslib="&lmvVAPTOutLib." casdata="&lmvVAPTOutTable." quiet;
-		droptable incaslib="&lmvVAPTGCOutLib." casdata="&lmvVAPTGCOutTable." quiet;
+		droptable incaslib="casuser" casdata="VA_PT_PREF" quiet;
+		droptable incaslib="casuser" casdata="VA_PT_GC_PREF" quiet;
+	run;
 	quit;
 
-	data casuser.VA_PT(DROP=UPT_REGULAR_SVD UPT_PROMO_SVD GC_REGULAR_SVD GC_PROMO_SVD UNITS_REGULAR_SVD UNITS_PROMO_SVD PRICE_REGULAR_SVD PRICE_PROMO_SVD);
+	data casuser.VA_PT_PREF(DROP=UPT_REGULAR_SVD UPT_PROMO_SVD GC_REGULAR_SVD GC_PROMO_SVD UNITS_REGULAR_SVD UNITS_PROMO_SVD PRICE_REGULAR_SVD PRICE_PROMO_SVD);
 		set casuser.report_data_final;
 		format pbo_location_id 8.;
 		LABEL PROMO_ID="PROMO"
@@ -585,7 +614,7 @@
 	run;
 	
 	/*проверить формат для этой таблицы */
-	data casuser.VA_PT_GC;
+	data casuser.VA_PT_GC_PREF;
 		set casuser.report_data_gc;
 		format pbo_location_id 8.;
 		
@@ -604,9 +633,68 @@
 				PROMO_ID promo_name_fmt.;
 	run;
 	
+	  %if %length(&lmvPromoClRk)>0 %then %do;
+				/* Если в CAS имеются результаты предыдущих расчетов (витрины для VA)*/
+				%if %sysfunc(exist(&lmvVAPTOutLib..&lmvVAPTOutTable.)) = 1 and %sysfunc(exist(&lmvVAPTGCOutLib..&lmvVAPTGCOutTable.)) = 1 %then %do;
+					data _NULL_;
+						set &lmvVAPTOutLib..&lmvVAPTOutTable.(obs=1);
+						call symputx('mvPromoClRK', PromoClRK);
+					run;
+					
+					data _NULL_;
+						set &lmvVAPTGCOutLib..&lmvVAPTGCOutTable.(obs=1);
+						call symputx('mvPromoClRKgc', PromoClRK);
+					run;
+					
+					/* Если в CAS имеются предыдущие отчеты для ВЫБРАННОГО промо календаря*/
+					%if &mvPromoClRKgc. = &mvPromoClRK. and &mvPromoClRK. = &lmvPromoClRk. %then %do;
+						/* В таком случае, необходимо актуализировать даные */
+						
+						/* Актуализация. Убираем из старого куска удаленные промо */
+						proc fedsql SESSREF=casauto noprint;
+							create table &lmvVAPTOutLib..&lmvVAPTOutTable.{options replace=true} as
+								select old.*			
+								from &lmvVAPTOutLib..&lmvVAPTOutTable. old
+								inner join casuser.pt_act_promo_list act
+									on old.promo_id = act.promo_id
+								;
+						quit;
+						
+						proc fedsql SESSREF=casauto noprint;
+							create table &lmvVAPTGCOutLib..&lmvVAPTGCOutTable.{options replace=true} as
+								select old.*			
+								from &lmvVAPTGCOutLib..&lmvVAPTGCOutTable. old
+								inner join casuser.pt_act_promo_list act
+									on old.promo_id = act.promo_id
+								;
+						quit;
+						
+						/* Аппендим старый кусок к новому*/
+						data casuser.VA_PT_GC_PREF(append=yes);
+							set &lmvVAPTGCOutLib..&lmvVAPTGCOutTable.;
+						run;
+
+						data casuser.VA_PT_PREF(append=yes);
+							set &lmvVAPTOutLib..&lmvVAPTOutTable.;
+						run;
+						
+					%end;
+				%end;
+					
+	%end;
+	
+	/* Удаляем старые куски */
 	proc casutil;
-		promote casdata='VA_PT' incaslib='casuser' casout="&lmvVAPTOutTable." outcaslib="&lmvVAPTOutLib.";
-		promote casdata='VA_PT_GC' incaslib='casuser' casout="&lmvVAPTGCOutTable." outcaslib="&lmvVAPTGCOutLib.";
+		droptable incaslib="&lmvVAPTOutLib." casdata="&lmvVAPTOutTable." quiet;
+		droptable incaslib="&lmvVAPTGCOutLib." casdata="&lmvVAPTGCOutTable." quiet;
 	quit;
 	
+	/* Промоутим новый кусок */
+	proc casutil;
+		promote casdata='VA_PT_PREF' incaslib='casuser' casout="&lmvVAPTOutTable." outcaslib="&lmvVAPTOutLib.";
+		promote casdata='VA_PT_GC_PREF' incaslib='casuser' casout="&lmvVAPTGCOutTable." outcaslib="&lmvVAPTGCOutLib.";
+	quit;
+	
+	
+
 %mend create_pt_report_views;
